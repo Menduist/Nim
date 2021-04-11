@@ -301,7 +301,7 @@ proc semArrayIndex(c: PContext, n: PNode): PType =
       if e.intVal < 0:
         localError(c.config, n.info,
           "Array length can't be negative, but was " & $e.intVal)
-      result = makeRangeType(c, 0, e.intVal-1, n.info, e.typ)
+      result = makeRangeType(c, min(0, e.intVal-1), max(0, e.intVal-1), n.info, e.typ)
     elif e.kind == nkSym and e.typ.kind == tyStatic:
       if e.sym.ast != nil:
         return semArrayIndex(c, e.sym.ast)
@@ -324,7 +324,7 @@ proc semArrayIndex(c: PContext, n: PNode): PType =
     else:
       let x = semConstExpr(c, e)
       if x.kind in {nkIntLit..nkUInt64Lit}:
-        result = makeRangeType(c, 0, x.intVal-1, n.info,
+        result = makeRangeType(c, min(0, x.intVal-1), max(0, x.intVal-1), n.info,
                              x.typ.skipTypes({tyTypeDesc}))
       else:
         result = x.typ.skipTypes({tyTypeDesc})

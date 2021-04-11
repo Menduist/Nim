@@ -572,7 +572,7 @@ proc arrayConstrType(c: PContext, n: PNode): PType =
   else:
     var t = skipTypes(n[0].typ, {tyGenericInst, tyVar, tyLent, tyOrdinal, tyAlias, tySink})
     addSonSkipIntLit(typ, t, c.idgen)
-  typ[0] = makeRangeType(c, 0, n.len - 1, n.info)
+  typ[0] = makeRangeType(c, min(0, n.len - 1), max(0, n.len - 1), n.info)
   result = typ
 
 proc semArrayConstr(c: PContext, n: PNode, flags: TExprFlags): PNode =
@@ -606,7 +606,10 @@ proc semArrayConstr(c: PContext, n: PNode, flags: TExprFlags): PNode =
     #var typ = skipTypes(result[0].typ, {tyGenericInst, tyVar, tyLent, tyOrdinal})
     for i in 1..<n.len:
       if lastIndex == lastValidIndex:
-        let validIndex = makeRangeType(c, toInt64(firstIndex), toInt64(lastValidIndex), n.info,
+        let validIndex = makeRangeType(c,
+                                       toInt64(min(firstIndex, lastIndex)),
+                                       toInt64(max(firstIndex, lastIndex)),
+                                       n.info,
                                        indexType)
         localError(c.config, n.info, "size of array exceeds range of index " &
           "type '$1' by $2 elements" % [typeToString(validIndex), $(n.len-i)])
@@ -628,8 +631,11 @@ proc semArrayConstr(c: PContext, n: PNode, flags: TExprFlags): PNode =
     addSonSkipIntLit(result.typ, typ, c.idgen)
     for i in 0..<result.len:
       result[i] = fitNode(c, typ, result[i], result[i].info)
-  result.typ[0] = makeRangeType(c, toInt64(firstIndex), toInt64(lastIndex), n.info,
-                                     indexType)
+  result.typ[0] = makeRangeType(c,
+                                toInt64(min(firstIndex, lastIndex)),
+                                toInt64(max(firstIndex, lastIndex)),
+                                n.info,
+                                indexType)
 
 proc fixAbstractType(c: PContext, n: PNode) =
   for i in 1..<n.len:
