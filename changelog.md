@@ -273,6 +273,8 @@
 - Added `genasts.genAst` that avoids the problems inherent with `quote do` and can
   be used as a replacement.
 
+- Added `countupordown`
+
 ## Language changes
 
 - `nimscript` now handles `except Exception as e`.

@@ -1011,7 +1011,7 @@ proc track(tracked: PEffects, n: PNode) =
       if op.kind == nkSym and fromSystem(op.sym):
         let iterVar = n[0]
         case op.sym.name.s
-        of "..", "countup", "countdown":
+        of "..", "countup", "countdown", "countupordown":
           let lower = iterCall[1]
           let upper = iterCall[2]
           # for i in 0..n   means  0 <= i and i <= n. Countdown is

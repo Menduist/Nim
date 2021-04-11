@@ -3,6 +3,53 @@ when sizeof(int) <= 2:
 else:
   type IntLikeForCount = int|int8|int16|int32|char|bool|uint8|uint16|enum
 
+
+iterator countupordown*[T](a, b: T, step: Positive = 1): T {.inline.} =
+  ## Counts from ordinal value `a` up or down to `b` (inclusive) with the given
+  ## step count.
+  ##
+  ## `T` may be any ordinal type, `step` may only be positive.
+  ##
+  ## **Note**: This fails to count to `low(int)` or `high(int)` if T = int for
+  ## efficiency reasons.
+  runnableExamples:
+    import std/sugar
+    let x = collect(newseq):
+      for i in countupordown(2, 9, 3):
+        i
+    assert x == @[2, 5, 8]
+    let y = collect(newseq):
+      for i in countupordown(9, 2, 3):
+        i
+    assert y == @[9, 6, 3]
+  mixin inc
+  mixin `<`
+  when T is IntLikeForCount and T is Ordinal:
+    var
+      avalue: int = int(a)
+      bvalue: int = int(b)
+  else:
+    var
+      avalue = a
+      bvalue = b
+  var
+    yieldedValue = addr avalue
+    stepvalue: int = int(step)
+
+  if a > b:
+    swap(avalue, bvalue)
+    yieldedValue = addr bvalue
+    stepvalue = -stepvalue
+
+  while avalue <= bvalue:
+    when T is IntLikeForCount and T is Ordinal:
+      yield T(yieldedValue[])
+    else:
+      yield yieldedValue[]
+    when T is (uint|uint64):
+      if avalue == bvalue: break
+    inc(yieldedValue[], stepvalue)
+
 iterator countdown*[T](a, b: T, step: Positive = 1): T {.inline.} =
   ## Counts from ordinal value `a` down to `b` (inclusive) with the given
   ## step count.
@@ -23,22 +70,10 @@ iterator countdown*[T](a, b: T, step: Positive = 1): T {.inline.} =
       for i in countdown(9, 2, 3):
         i
     assert y == @[9, 6, 3]
-  when T is (uint|uint64):
-    var res = a
-    while res >= b:
-      yield res
-      if res == b: break
-      dec(res, step)
-  elif T is IntLikeForCount and T is Ordinal:
-    var res = int(a)
-    while res >= int(b):
-      yield T(res)
-      dec(res, step)
-  else:
-    var res = a
-    while res >= b:
-      yield res
-      dec(res, step)
+
+  if a >= b:
+    for i in countupordown(a, b, step):
+      yield i
 
 iterator countup*[T](a, b: T, step: Positive = 1): T {.inline.} =
   ## Counts from ordinal value `a` to `b` (inclusive) with the given
@@ -60,19 +95,11 @@ iterator countup*[T](a, b: T, step: Positive = 1): T {.inline.} =
       for i in countup(2, 9, 3):
         i
     assert y == @[2, 5, 8]
-  mixin inc
-  when T is IntLikeForCount and T is Ordinal:
-    var res = int(a)
-    while res <= int(b):
-      yield T(res)
-      inc(res, step)
-  else:
-    var res = a
-    while res <= b:
-      yield res
-      inc(res, step)
+  if a <= b:
+    for i in countupordown(a, b, step):
+      yield i
 
-iterator `..`*[T](a, b: T): T {.inline.} =
+iterator `..`*[T, U](a: T, b: U): T {.inline.} =
   ## An alias for `countup(a, b, 1)`.
   ##
   ## See also:
@@ -85,55 +112,13 @@ iterator `..`*[T](a, b: T): T {.inline.} =
         i
 
     assert x == @[3, 4, 5, 6, 7]
-  mixin inc
-  when T is IntLikeForCount and T is Ordinal:
-    var res = int(a)
-    while res <= int(b):
-      yield T(res)
-      inc(res)
-  else:
-    var res = a
-    while res <= b:
-      yield res
-      inc(res)
-
-template dotdotImpl(t) {.dirty.} =
-  iterator `..`*(a, b: t): t {.inline.} =
-    ## A type specialized version of `..` for convenience so that
-    ## mixing integer types works better.
-    ##
-    ## See also:
-    ## * [..<](#..<.i,T,T)
-    var res = a
-    while res <= b:
-      yield res
-      inc(res)
-
-dotdotImpl(int64)
-dotdotImpl(int32)
-dotdotImpl(uint64)
-dotdotImpl(uint32)
-
-iterator `..<`*[T](a, b: T): T {.inline.} =
-  mixin inc
-  var i = a
-  while i < b:
+  for i in countup(a, T(b)):
     yield i
-    inc i
 
-template dotdotLessImpl(t) {.dirty.} =
-  iterator `..<`*(a, b: t): t {.inline.} =
-    ## A type specialized version of `..<` for convenience so that
-    ## mixing integer types works better.
-    var res = a
-    while res < b:
-      yield res
-      inc(res)
-
-dotdotLessImpl(int64)
-dotdotLessImpl(int32)
-dotdotLessImpl(uint64)
-dotdotLessImpl(uint32)
+iterator `..<`*[T, U](a: T, b: U): T {.inline.} =
+  if a < T(b):
+    for i in countupordown(a, pred(T(b)), 1):
+      yield i
 
 iterator `||`*[S, T](a: S, b: T, annotation: static string = "parallel for"): T {.
   inline, magic: "OmpParFor", sideEffect.} =
