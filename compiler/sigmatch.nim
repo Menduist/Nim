@@ -2317,7 +2317,7 @@ proc arrayConstr(c: PContext, n: PNode): PType =
 
 proc arrayConstr(c: PContext, info: TLineInfo): PType =
   result = newTypeS(tyArray, c)
-  rawAddSon(result, makeRangeType(c, 0, -1, info))
+  rawAddSon(result, makeRangeType(c, -1, 0, info))
   rawAddSon(result, newTypeS(tyEmpty, c)) # needs an empty basetype!
 
 proc incrIndexType(t: PType) =
