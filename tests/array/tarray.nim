@@ -587,3 +587,7 @@ block t12466:
     a[0'u16 + i] = i
   for i in 0'u16 ..< 8'u16:
     a[0'u16 + i] = i
+
+block emptyArrayHighType:
+  var a = array[0, int].high
+  a = int a

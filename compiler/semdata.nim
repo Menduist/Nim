@@ -479,6 +479,12 @@ proc makeNotType*(c: PContext, t1: PType): PType =
 proc nMinusOne(c: PContext; n: PNode): PNode =
   result = newTreeI(nkCall, n.info, newSymNode(getSysMagic(c.graph, n.info, "pred", mPred)), n)
 
+proc makeMin(c: PContext; a: PNode, b: PNode): PNode =
+  result = newTreeI(nkCall, a.info, newSymNode(getSysMagic(c.graph, a.info, "min", mMinI)), a, b)
+
+proc makeMax(c: PContext; a: PNode, b: PNode): PNode =
+  result = newTreeI(nkCall, a.info, newSymNode(getSysMagic(c.graph, a.info, "max", mMaxI)), a, b)
+
 # Remember to fix the procs below this one when you make changes!
 proc makeRangeWithStaticExpr*(c: PContext, n: PNode): PType =
   let intType = getSysType(c.graph, n.info, tyInt)
@@ -486,8 +492,16 @@ proc makeRangeWithStaticExpr*(c: PContext, n: PNode): PType =
   result.sons = @[intType]
   if n.typ != nil and n.typ.n == nil:
     result.flags.incl tfUnresolved
-  result.n = newTreeI(nkRange, n.info, newIntTypeNode(0, intType),
-    makeStaticExpr(c, nMinusOne(c, n)))
+
+  let
+    startv = newIntTypeNode(0, intType)
+    endv = nMinusOne(c, n)
+
+  result.n = newTreeI(nkRange, n.info,
+                      makeStaticExpr(c, makeMin(c, startv, endv)),
+                      makeStaticExpr(c, makeMax(c, startv, endv)),
+                      )
+
 
 template rangeHasUnresolvedStatic*(t: PType): bool =
   tfUnresolved in t.flags
@@ -510,8 +524,8 @@ proc makeRangeType*(c: PContext; first, last: BiggestInt;
                     info: TLineInfo; intType: PType = nil): PType =
   let intType = if intType != nil: intType else: getSysType(c.graph, info, tyInt)
   var n = newNodeI(nkRange, info)
-  n.add newIntTypeNode(first, intType)
-  n.add newIntTypeNode(last, intType)
+  n.add newIntTypeNode(min(first, last), intType)
+  n.add newIntTypeNode(max(first, last), intType)
   result = newTypeS(tyRange, c)
   result.n = n
   addSonSkipIntLit(result, intType, c.idgen) # basetype of range

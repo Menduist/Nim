@@ -728,6 +728,8 @@ proc typeToString(typ: PType, prefer: TPreferedDesc = preferName): string =
     result.addTypeFlags(t)
   result = typeToString(typ, prefer)
 
+proc lastOrd*(conf: ConfigRef; t: PType): Int128
+
 proc firstOrd*(conf: ConfigRef; t: PType): Int128 =
   case t.kind
   of tyBool, tyChar, tySequence, tyOpenArray, tyString, tyVarargs, tyProxy:
@@ -737,7 +739,12 @@ proc firstOrd*(conf: ConfigRef; t: PType): Int128 =
   of tyRange:
     assert(t.n != nil)        # range directly given:
     assert(t.n.kind == nkRange)
-    result = getOrdValue(t.n[0])
+    let
+      left = getOrdValue(t.n[0])
+      right = getOrdValue(t.n[1])
+    result = left
+    if left == -1 and right == 0: # Handle reversed range
+      result = right
   of tyInt:
     if conf != nil and conf.target.intSize == 4:
       result = toInt128(-2147483648)
@@ -792,7 +799,12 @@ proc lastOrd*(conf: ConfigRef; t: PType): Int128 =
   of tyRange:
     assert(t.n != nil)        # range directly given:
     assert(t.n.kind == nkRange)
-    result = getOrdValue(t.n[1])
+    let
+      left = getOrdValue(t.n[0])
+      right = getOrdValue(t.n[1])
+    result = right
+    if left == -1 and right == 0: # Handle reversed range
+      result = left
   of tyInt:
     if conf != nil and conf.target.intSize == 4: result = toInt128(0x7FFFFFFF)
     else: result = toInt128(0x7FFFFFFFFFFFFFFF'u64)
