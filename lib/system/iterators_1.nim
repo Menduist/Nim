@@ -4,7 +4,7 @@ else:
   type IntLikeForCount = int|int8|int16|int32|char|bool|uint8|uint16|enum
 
 
-iterator countupordown*[T](a, b: T, step: Positive = 1): T {.inline.} =
+iterator countupordown*[T, U](a: T, b: U, step: Positive = 1): T {.inline.} =
   ## Counts from ordinal value `a` up or down to `b` (inclusive) with the given
   ## step count.
   ##
@@ -36,7 +36,7 @@ iterator countupordown*[T](a, b: T, step: Positive = 1): T {.inline.} =
     yieldedValue = addr avalue
     stepvalue: int = int(step)
 
-  if a > b:
+  if avalue > bvalue:
     swap(avalue, bvalue)
     yieldedValue = addr bvalue
     stepvalue = -stepvalue
@@ -50,7 +50,7 @@ iterator countupordown*[T](a, b: T, step: Positive = 1): T {.inline.} =
       if avalue == bvalue: break
     inc(yieldedValue[], stepvalue)
 
-iterator countdown*[T](a, b: T, step: Positive = 1): T {.inline.} =
+iterator countdown*[T, U](a: T, b: U, step: Positive = 1): T {.inline.} =
   ## Counts from ordinal value `a` down to `b` (inclusive) with the given
   ## step count.
   ##
@@ -71,11 +71,16 @@ iterator countdown*[T](a, b: T, step: Positive = 1): T {.inline.} =
         i
     assert y == @[9, 6, 3]
 
-  if a >= b:
-    for i in countupordown(a, b, step):
-      yield i
+  when T is IntLikeForCount and T is Ordinal:
+    if int(a) >= int(b):
+      for i in countupordown(a, b, step):
+        yield i
+  else:
+    if a >= b:
+      for i in countupordown(a, b, step):
+        yield i
 
-iterator countup*[T](a, b: T, step: Positive = 1): T {.inline.} =
+iterator countup*[T, U](a: T, b: U, step: Positive = 1): T {.inline.} =
   ## Counts from ordinal value `a` to `b` (inclusive) with the given
   ## step count.
   ##
@@ -95,11 +100,24 @@ iterator countup*[T](a, b: T, step: Positive = 1): T {.inline.} =
       for i in countup(2, 9, 3):
         i
     assert y == @[2, 5, 8]
-  if a <= b:
+  when T is IntLikeForCount and T is Ordinal:
+    if int(a) <= int(b):
+      for i in countupordown(a, b, step):
+        yield i
+  else:
+    if a <= b:
+      for i in countupordown(a, b, step):
+        yield i
+
+iterator countup*(a, b: uint, step: Positive = 1): uint {.inline.} =
     for i in countupordown(a, b, step):
       yield i
 
-iterator `..`*[T, U](a: T, b: U): U {.inline.} =
+iterator countup*(a, b: int, step: Positive = 1): int {.inline.} =
+    for i in countupordown(a, b, step):
+      yield i
+
+iterator `..`*[T, U](a: T, b: U): T {.inline.} =
   ## An alias for `countup(a, b, 1)`.
   ##
   ## See also:
@@ -115,10 +133,12 @@ iterator `..`*[T, U](a: T, b: U): U {.inline.} =
   for i in countup(a, b):
     yield i
 
-iterator `..<`*[T, U](a: T, b: U): U {.inline.} =
-  if U(a) < b:
-    for i in countupordown(U(a), pred(b), 1):
-      yield i
+iterator `..<`*[T, U](a: T, b: U): T {.inline.} =
+  for i in countup(a, pred(b)):
+    yield i
+ # if a < b:
+ #   for i in countupordown(a, pred(b), 1):
+ #     yield i
 
 iterator `||`*[S, T](a: S, b: T, annotation: static string = "parallel for"): T {.
   inline, magic: "OmpParFor", sideEffect.} =
