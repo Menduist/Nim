@@ -99,7 +99,7 @@ iterator countup*[T](a, b: T, step: Positive = 1): T {.inline.} =
     for i in countupordown(a, b, step):
       yield i
 
-iterator `..`*[T, U](a: T, b: U): T {.inline.} =
+iterator `..`*[T, U](a: T, b: U): U {.inline.} =
   ## An alias for `countup(a, b, 1)`.
   ##
   ## See also:
@@ -112,12 +112,12 @@ iterator `..`*[T, U](a: T, b: U): T {.inline.} =
         i
 
     assert x == @[3, 4, 5, 6, 7]
-  for i in countup(a, T(b)):
+  for i in countup(a, b):
     yield i
 
-iterator `..<`*[T, U](a: T, b: U): T {.inline.} =
-  if a < T(b):
-    for i in countupordown(a, pred(T(b)), 1):
+iterator `..<`*[T, U](a: T, b: U): U {.inline.} =
+  if U(a) < b:
+    for i in countupordown(U(a), pred(b), 1):
       yield i
 
 iterator `||`*[S, T](a: S, b: T, annotation: static string = "parallel for"): T {.

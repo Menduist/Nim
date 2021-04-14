@@ -8,6 +8,7 @@ doAssert JsBigInt isnot int
 func big*(integer: SomeInteger): JsBigInt {.importjs: "BigInt(#)".}
 func big*(integer: cstring): JsBigInt {.importjs: "BigInt(#)".}
 func `<=`*(x, y: JsBigInt): bool {.importjs: "(# $1 #)".}
+func `<`*(x, y: JsBigInt): bool {.importjs: "(# $1 #)".}
 func `==`*(x, y: JsBigInt): bool {.importjs: "(# === #)".}
 func inc*(x: var JsBigInt) {.importjs: "[#][0][0]++".}
 func inc2*(x: var JsBigInt) {.importjs: "#++".}
