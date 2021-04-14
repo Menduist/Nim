@@ -3,10 +3,15 @@ when sizeof(int) <= 2:
 else:
   type IntLikeForCount = int|int8|int16|int32|char|bool|uint8|uint16|enum
 
+template getCountableValue(val, fallback: untyped): untyped =
+  when val is IntLikeForCount and val is Ordinal:
+    int(val)
+  else:
+    fallback(val)
 
 iterator countupordown*[T, U](a: T, b: U, step: Positive = 1): T {.inline.} =
   ## Counts from ordinal value `a` up or down to `b` (inclusive) with the given
-  ## step count.
+  ## step size.
   ##
   ## `T` may be any ordinal type, `step` may only be positive.
   ##
@@ -24,15 +29,10 @@ iterator countupordown*[T, U](a: T, b: U, step: Positive = 1): T {.inline.} =
     assert y == @[9, 6, 3]
   mixin inc
   mixin `<`
-  when T is IntLikeForCount and T is Ordinal:
-    var
-      avalue: int = int(a)
-      bvalue: int = int(b)
-  else:
-    var
-      avalue = a
-      bvalue = b
+
   var
+    avalue = getCountableValue(a, T)
+    bvalue = getCountableValue(b, T)
     yieldedValue = addr avalue
     stepvalue: int = int(step)
 
@@ -42,17 +42,14 @@ iterator countupordown*[T, U](a: T, b: U, step: Positive = 1): T {.inline.} =
     stepvalue = -stepvalue
 
   while avalue <= bvalue:
-    when T is IntLikeForCount and T is Ordinal:
-      yield T(yieldedValue[])
-    else:
-      yield yieldedValue[]
-    when T is (uint|uint64):
+    yield T(yieldedValue[])
+    when avalue is (uint|uint64):
       if avalue == bvalue: break
     inc(yieldedValue[], stepvalue)
 
 iterator countdown*[T, U](a: T, b: U, step: Positive = 1): T {.inline.} =
   ## Counts from ordinal value `a` down to `b` (inclusive) with the given
-  ## step count.
+  ## step size.
   ##
   ## `T` may be any ordinal type, `step` may only be positive.
   ##
@@ -71,18 +68,13 @@ iterator countdown*[T, U](a: T, b: U, step: Positive = 1): T {.inline.} =
         i
     assert y == @[9, 6, 3]
 
-  when T is IntLikeForCount and T is Ordinal:
-    if int(a) >= int(b):
-      for i in countupordown(a, b, step):
-        yield i
-  else:
-    if a >= b:
-      for i in countupordown(a, b, step):
-        yield i
+  if getCountableValue(a, T) >= getCountableValue(b, T):
+    for i in countupordown(a, b, step):
+      yield i
 
 iterator countup*[T, U](a: T, b: U, step: Positive = 1): T {.inline.} =
   ## Counts from ordinal value `a` to `b` (inclusive) with the given
-  ## step count.
+  ## step size.
   ##
   ## `T` may be any ordinal type, `step` may only be positive.
   ##
@@ -100,28 +92,15 @@ iterator countup*[T, U](a: T, b: U, step: Positive = 1): T {.inline.} =
       for i in countup(2, 9, 3):
         i
     assert y == @[2, 5, 8]
-  when T is IntLikeForCount and T is Ordinal:
-    if int(a) <= int(b):
-      for i in countupordown(a, b, step):
-        yield i
-  else:
-    if a <= b:
-      for i in countupordown(a, b, step):
-        yield i
-
-iterator countup*(a, b: uint, step: Positive = 1): uint {.inline.} =
-    for i in countupordown(a, b, step):
-      yield i
-
-iterator countup*(a, b: int, step: Positive = 1): int {.inline.} =
+  if getCountableValue(a, T) <= getCountableValue(b, T):
     for i in countupordown(a, b, step):
       yield i
 
 iterator `..`*[T, U](a: T, b: U): T {.inline.} =
-  ## An alias for `countup(a, b, 1)`.
+  ## An alias for `countup(a, b)`.
   ##
   ## See also:
-  ## * [..<](#..<.i,T,T)
+  ## * [..<](#..<.i,T,U)
   runnableExamples:
     import std/sugar
 
@@ -134,11 +113,12 @@ iterator `..`*[T, U](a: T, b: U): T {.inline.} =
     yield i
 
 iterator `..<`*[T, U](a: T, b: U): T {.inline.} =
+  ## An alias for `countup(a, pred(b))`.
+  ##
+  ## See also:
+  ## * [..](#...i,T,U)
   for i in countup(a, pred(b)):
     yield i
- # if a < b:
- #   for i in countupordown(a, pred(b), 1):
- #     yield i
 
 iterator `||`*[S, T](a: S, b: T, annotation: static string = "parallel for"): T {.
   inline, magic: "OmpParFor", sideEffect.} =
