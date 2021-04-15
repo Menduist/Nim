@@ -29,18 +29,37 @@ try:
   x = f()
   block :tmp:
     var i_cursor
-    var i_1 = 0
     block :tmp_1:
-      while i_1 < 4:
-        var :tmpD
-        i_cursor = i_1
-        if i_cursor == 2:
-          return
-        add(a):
-          wasMoved(:tmpD)
-          `=copy`(:tmpD, x)
-          :tmpD
-        inc i_1, 1
+      var i_1_cursor
+      var :tmp_2
+      :tmp_2 = 3
+      if 0 <= int(:tmp_2):
+        block :tmp_3:
+          var i_2
+          mixin inc
+          mixin <
+          var avalue = 0
+          var bvalue = int(:tmp_2)
+          var yieldedValue = addr(avalue)
+          var stepvalue: int = 1
+          if (
+            bvalue < avalue):
+            swap(avalue, bvalue)
+            yieldedValue = addr(bvalue)
+            stepvalue = -stepvalue
+          block :tmp_4:
+            while avalue <= bvalue:
+              var :tmpD
+              i_2 = T(yieldedValue[])
+              i_1_cursor = i_2
+              i_cursor = i_1_cursor
+              if i_cursor == 2:
+                return
+              add(a):
+                wasMoved(:tmpD)
+                `=copy`(:tmpD, x)
+                :tmpD
+              inc(yieldedValue[], stepvalue)
   if cond:
     add(a):
       let blitTmp = x

@@ -11,18 +11,18 @@ ttypeAllowed.nim(26, 10) Error: invalid type: 'iterator (a: int, b: int, step: P
 
 
 let f1 = case true
-  of true:  countup[int]
-  of false: countdown[int]
+  of true:  countup[int,int]
+  of false: countdown[int,int]
 
 const f2 = case true
-  of true:  countup[int]
-  of false: countdown[int]
+  of true:  countup[int,int]
+  of false: countdown[int,int]
 
 var f3 = case true
-  of true:  countup[int]
-  of false: countdown[int]
+  of true:  countup[int,int]
+  of false: countdown[int,int]
 
 proc foobar(): auto =
   result = case true
-    of true:  countup[int]
-    of false: countdown[int]
+    of true:  countup[int,int]
+    of false: countdown[int,int]

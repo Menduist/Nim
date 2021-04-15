@@ -69,7 +69,11 @@ iterator countdown*[T, U](a: T, b: U, step: Positive = 1): T {.inline.} =
         i
     assert y == @[9, 6, 3]
 
-  if getCountableValue(a, T) >= getCountableValue(b, T):
+  let
+    avalue = getCountableValue(a, T)
+    bvalue = getCountableValue(b, type(avalue))
+
+  if avalue >= bvalue:
     for i in countupordown(a, b, step):
       yield i
 
@@ -91,7 +95,11 @@ iterator countup*[T, U](a: T, b: U, step: Positive = 1): T {.inline.} =
       for i in countup(2, 9, 3):
         i
     assert y == @[2, 5, 8]
-  if getCountableValue(a, T) <= getCountableValue(b, T):
+  let
+    avalue = getCountableValue(a, T)
+    bvalue = getCountableValue(b, type(avalue))
+
+  if avalue <= bvalue:
     for i in countupordown(a, b, step):
       yield i
 
