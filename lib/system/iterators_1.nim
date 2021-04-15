@@ -35,7 +35,7 @@ iterator countupordown*[T, U](a: T, b: U, step: Positive = 1): T {.inline.} =
 
   var
     avalue = getCountableValue(a, T)
-    bvalue = getCountableValue(b, type(avalue))
+    bvalue = type(avalue)b
     yieldedValue = addr avalue
     stepvalue: int = int(step)
 
@@ -71,7 +71,7 @@ iterator countdown*[T, U](a: T, b: U, step: Positive = 1): T {.inline.} =
 
   let
     avalue = getCountableValue(a, T)
-    bvalue = getCountableValue(b, type(avalue))
+    bvalue = type(avalue)b
 
   if avalue >= bvalue:
     for i in countupordown(a, b, step):
@@ -97,7 +97,7 @@ iterator countup*[T, U](a: T, b: U, step: Positive = 1): T {.inline.} =
     assert y == @[2, 5, 8]
   let
     avalue = getCountableValue(a, T)
-    bvalue = getCountableValue(b, type(avalue))
+    bvalue = type(avalue)b
 
   if avalue <= bvalue:
     for i in countupordown(a, b, step):

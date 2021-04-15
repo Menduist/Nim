@@ -48,8 +48,8 @@ proc allocMemory*(mem: UserProcessMemory, base, size: uint32) =
         data: newSeq[byte](roundedSize))
     for i in 0..<(roundedSize shr 12):
         mem.pages[i + int(roundedBase shr 12)] = memBlock.info
-        #echo cast[uint64](addr mem.pageAccess[i + (roundedBase shr 12)])
-        mem.pageAccess[i + (roundedBase shr 12)] = cast[ptr UncheckedArray[byte]](addr memBlock.data[i * 0x1000])
+        #echo cast[uint64](addr mem.pageAccess[i + int(roundedBase shr 12)])
+        mem.pageAccess[i + int(roundedBase shr 12)] = cast[ptr UncheckedArray[byte]](addr memBlock.data[i * 0x1000])
     mem.blocks.add memBlock
 
     #for i in (roundedBase shr 12)..<((roundedBase + roundedSize) shr 12):
