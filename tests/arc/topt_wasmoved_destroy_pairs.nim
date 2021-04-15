@@ -29,37 +29,42 @@ try:
   x = f()
   block :tmp:
     var i_cursor
-    block :tmp_1:
-      var i_1_cursor
-      var :tmp_2
-      :tmp_2 = 3
-      if 0 <= int(:tmp_2):
-        block :tmp_3:
-          var i_2
-          mixin inc
-          mixin <
-          var avalue = 0
-          var bvalue = int(:tmp_2)
-          var yieldedValue = addr(avalue)
-          var stepvalue: int = 1
-          if (
-            bvalue < avalue):
-            swap(avalue, bvalue)
-            yieldedValue = addr(bvalue)
-            stepvalue = -stepvalue
-          block :tmp_4:
-            while avalue <= bvalue:
-              var :tmpD
-              i_2 = T(yieldedValue[])
-              i_1_cursor = i_2
-              i_cursor = i_1_cursor
-              if i_cursor == 2:
-                return
-              add(a):
-                wasMoved(:tmpD)
-                `=copy`(:tmpD, x)
-                :tmpD
-              inc(yieldedValue[], stepvalue)
+    let avalue = 0
+    let bvalue = 4
+    if avalue < bvalue:
+      block :tmp_1:
+        var i_1_cursor
+        var :tmp_2
+        :tmp_2 = 3
+        let avalue_1 = 0
+        let bvalue_1 = typeof(avalue_2)(:tmp_2)
+        if avalue_1 <= bvalue_1:
+          block :tmp_3:
+            var i_2
+            mixin inc
+            mixin <
+            var avalue_3 = 0
+            var bvalue_2 = typeof(avalue_4)(:tmp_2)
+            var yieldedValue = addr(avalue_3)
+            var stepvalue: int = 1
+            if (
+              bvalue_2 < avalue_3):
+              swap(avalue_3, bvalue_2)
+              yieldedValue = addr(bvalue_2)
+              stepvalue = -stepvalue
+            block :tmp_4:
+              while avalue_3 <= bvalue_2:
+                var :tmpD
+                i_2 = T(yieldedValue[])
+                i_1_cursor = i_2
+                i_cursor = i_1_cursor
+                if i_cursor == 2:
+                  return
+                add(a):
+                  wasMoved(:tmpD)
+                  `=copy`(:tmpD, x)
+                  :tmpD
+                inc(yieldedValue[], stepvalue)
   if cond:
     add(a):
       let blitTmp = x

@@ -124,8 +124,13 @@ iterator `..<`*[T, U](a: T, b: U): T {.inline.} =
   ##
   ## See also:
   ## * [..](#...i,T,U)
-  for i in countup(a, pred(b)):
-    yield i
+  let
+    avalue = getCountableValue(a, T)
+    bvalue = type(avalue)b
+
+  if avalue < bvalue:
+    for i in countup(a, pred(b)):
+      yield i
 
 iterator `||`*[S, T](a: S, b: T, annotation: static string = "parallel for"): T {.
   inline, magic: "OmpParFor", sideEffect.} =
