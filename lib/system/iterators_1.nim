@@ -13,7 +13,10 @@ iterator countupordown*[T, U](a: T, b: U, step: Positive = 1): T {.inline.} =
   ## Counts from ordinal value `a` up or down to `b` (inclusive) with the given
   ## step size.
   ##
-  ## `T` may be any ordinal type, `step` may only be positive.
+  ## `T` and `U` should be in `{int8..int32, char, bool, uint8, uint16, enum}`
+  ## OR `U` should be cast-able into `T`
+  ##
+  ## `T` should be Ordinal, `step` must be positive.
   ##
   ## **Note**: This fails to count to `low(int)` or `high(int)` if T = int for
   ## efficiency reasons.
@@ -32,7 +35,7 @@ iterator countupordown*[T, U](a: T, b: U, step: Positive = 1): T {.inline.} =
 
   var
     avalue = getCountableValue(a, T)
-    bvalue = getCountableValue(b, T)
+    bvalue = getCountableValue(b, type(avalue))
     yieldedValue = addr avalue
     stepvalue: int = int(step)
 
@@ -51,10 +54,8 @@ iterator countdown*[T, U](a: T, b: U, step: Positive = 1): T {.inline.} =
   ## Counts from ordinal value `a` down to `b` (inclusive) with the given
   ## step size.
   ##
-  ## `T` may be any ordinal type, `step` may only be positive.
-  ##
-  ## **Note**: This fails to count to `low(int)` if T = int for
-  ## efficiency reasons.
+  ## Wrapper, for more details:
+  ## * [countupordown](#countupordown.i,T,U,Positive)
   runnableExamples:
     import std/sugar
     let x = collect(newSeq):
@@ -76,10 +77,8 @@ iterator countup*[T, U](a: T, b: U, step: Positive = 1): T {.inline.} =
   ## Counts from ordinal value `a` to `b` (inclusive) with the given
   ## step size.
   ##
-  ## `T` may be any ordinal type, `step` may only be positive.
-  ##
-  ## **Note**: This fails to count to `high(int)` if T = int for
-  ## efficiency reasons.
+  ## Wrapper, for more details:
+  ## * [countupordown](#countupordown.i,T,U,Positive)
   runnableExamples:
     import std/sugar
     let x = collect(newSeq):
@@ -97,7 +96,7 @@ iterator countup*[T, U](a: T, b: U, step: Positive = 1): T {.inline.} =
       yield i
 
 iterator `..`*[T, U](a: T, b: U): T {.inline.} =
-  ## An alias for `countup(a, b)`.
+  ## An alias for [countup](#countup.i,T,U,Positive)(a, b).
   ##
   ## See also:
   ## * [..<](#..<.i,T,U)
@@ -113,7 +112,7 @@ iterator `..`*[T, U](a: T, b: U): T {.inline.} =
     yield i
 
 iterator `..<`*[T, U](a: T, b: U): T {.inline.} =
-  ## An alias for `countup(a, pred(b))`.
+  ## An alias for [countup](#countup.i,T,U,Positive)(a, pred(b)).
   ##
   ## See also:
   ## * [..](#...i,T,U)
