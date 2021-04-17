@@ -521,14 +521,14 @@ proc `..`*[T, U](a: sink T, b: sink U): HSlice[T, U] {.noSideEffect, inline.} =
   result = HSlice[T, U](a: a, b: b)
 
 when defined(nimLegacyUnarySlice):
-proc `..`*[T](b: sink T): HSlice[int, T]
-    {.noSideEffect, inline, deprecated: "replace `..b` with `0..b`".} =
-  ## Unary `slice`:idx: operator that constructs an interval `[default(int), b]`.
-  ##
-  ## .. code-block:: Nim
-  ##   let a = [10, 20, 30, 40, 50]
-  ##   echo a[.. 2] # @[10, 20, 30]
-  0 .. b
+  proc `..`*[T](b: sink T): HSlice[int, T]
+      {.noSideEffect, inline, deprecated: "replace `..b` with `0..b`".} =
+    ## Unary `slice`:idx: operator that constructs an interval `[default(int), b]`.
+    ##
+    ## .. code-block:: Nim
+    ##   let a = [10, 20, 30, 40, 50]
+    ##   echo a[.. 2] # @[10, 20, 30]
+    0 .. b
 
 template `^`*(x: int): BackwardsIndex = BackwardsIndex(x)
   ## Builtin `roof`:idx: operator that can be used for convenient array access.

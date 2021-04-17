@@ -2147,9 +2147,6 @@ proc genMagic(p: PProc, n: PNode, r: var TCompRes) =
   of mNewString: unaryExpr(p, n, r, "mnewString", "mnewString($1)")
   of mNewStringOfCap:
     unaryExpr(p, n, r, "mnewString", "mnewString(0)")
-  of mDotDot:
-    genProcForSymIfNeeded(p, n[0].sym)
-    genCall(p, n, r)
   of mParseBiggestFloat:
     useMagic(p, "nimParseBiggestFloat")
     genCall(p, n, r)

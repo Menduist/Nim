@@ -506,8 +506,6 @@ proc magicsAfterOverloadResolution(c: PContext, n: PNode,
   of mProcCall:
     result = n
     result.typ = n[1].typ
-  of mDotDot:
-    result = n
   of mPlugin:
     let plugin = getPlugin(c.cache, n[0].sym)
     if plugin.isNil:
