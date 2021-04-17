@@ -30,7 +30,7 @@ type
     wTemplate = "template", wTry = "try", wTuple = "tuple", wType = "type", wUsing = "using",
     wVar = "var", wWhen = "when", wWhile = "while", wXor = "xor", wYield = "yield",
 
-    wColon = ":", wColonColon = "::", wEquals = "=", wDot = ".", wDotDot = "..",
+    wColon = ":", wColonColon = "::", wEquals = "=", wDot = ".",
     wStar = "*", wMinus = "-",
     wMagic = "magic", wThread = "thread", wFinal = "final", wProfiler = "profiler",
     wMemTracker = "memtracker", wObjChecks = "objchecks",
@@ -115,7 +115,7 @@ type
 
 const
   oprLow* = ord(wColon)
-  oprHigh* = ord(wDotDot)
+  oprHigh* = ord(wDot)
 
   nimKeywordsLow* = ord(wAsm)
   nimKeywordsHigh* = ord(wYield)

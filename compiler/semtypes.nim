@@ -217,8 +217,16 @@ proc semDistinct(c: PContext, n: PNode, prev: PType): PType =
   addSonSkipIntLit(result, semTypeNode(c, n[0], nil), c.idgen)
   if n.len > 1: result.n = n[1]
 
+proc isRange*(c: PContext, n: PNode): bool {.inline.} =
+  if n.kind == nkIdent: return false
+  let e = semExprWithType(c, n, {efDetermineType})
+  if e == nil:
+    return false
+  #let e = semExprWithType(c, n[1], {efDetermineType})
+  result = e.typ.skipTypes({tyGenericInst, tyAlias}).typeToString() == "HSlice"
+
 proc semRangeAux(c: PContext, n: PNode, prev: PType): PType =
-  assert isRange(n)
+  assert isRange(c, n)
   checkSonsLen(n, 3, c.config)
   result = newOrPrevType(tyRange, prev, c)
   result.n = newNodeI(nkRange, n.info)
@@ -267,8 +275,28 @@ proc semRangeAux(c: PContext, n: PNode, prev: PType): PType =
 
 proc semRange(c: PContext, n: PNode, prev: PType): PType =
   result = nil
+  #if isRange(c, n[1]):
+  #  result = semRangeAux(c, n[1], prev)
+  #  echo result
+    #let e = tryConstExpr(c, n[1])
+    #result = newOrPrevType(tyRange, prev, c)
+    #result.n = newNodeI(nkRange, n.info)
+    #result.n.add e.sons[1].sons[1]
+    #result.n.add e.sons[2].sons[1]
+  #else:
+  #  result = newOrPrevType(tyError, prev, c)
+
+  #return result
+  #let e = semExprWithType(c, n[1], {efDetermineType})
+  #let e = tryConstExpr(c, n[1])
+  #echo e.kind
+  #echo e.typ
+  #echo e.typ.kind
+  #echo repr e.typ.skipTypes({tyGenericInst, tyAlias})
+  #echo e.typ.skipTypes({tyGenericInst, tyAlias}).typeToString() == "HSlice"
+  #echo semTypeNode(c, n[1], nil).kind
   if n.len == 2:
-    if isRange(n[1]):
+    if isRange(c, n[1]):
       result = semRangeAux(c, n[1], prev)
       let n = result.n
       if n[0].kind in {nkCharLit..nkUInt64Lit} and n[0].intVal > 0:
@@ -292,7 +320,7 @@ proc semRange(c: PContext, n: PNode, prev: PType): PType =
     result = newOrPrevType(tyError, prev, c)
 
 proc semArrayIndex(c: PContext, n: PNode): PType =
-  if isRange(n):
+  if isRange(c, n):
     result = semRangeAux(c, n, nil)
   else:
     let e = semExprWithType(c, n, {efDetermineType})
@@ -546,12 +574,12 @@ proc semCaseBranchRange(c: PContext, t, b: PNode,
 
 proc semCaseBranchSetElem(c: PContext, t, b: PNode,
                           covered: var Int128): PNode =
-  if isRange(b):
-    checkSonsLen(b, 3, c.config)
-    result = semBranchRange(c, t, b[1], b[2], covered)
-  elif b.kind == nkRange:
+  if b.kind == nkRange:
     checkSonsLen(b, 2, c.config)
     result = semBranchRange(c, t, b[0], b[1], covered)
+  elif isRange(c, b):
+    checkSonsLen(b, 3, c.config)
+    result = semBranchRange(c, t, b[1], b[2], covered)
   else:
     result = fitNode(c, t[0].typ, b, b.info)
     inc(covered)
@@ -563,7 +591,7 @@ proc semCaseBranch(c: PContext, t, branch: PNode, branchIndex: int,
     var b = branch[i]
     if b.kind == nkRange:
       branch[i] = b
-    elif isRange(b):
+    elif isRange(c, b):
       branch[i] = semCaseBranchRange(c, t, b, covered)
     else:
       # constant sets and arrays are allowed:
@@ -1744,8 +1772,8 @@ proc semTypeNode(c: PContext, n: PNode, prev: PType): PType =
       let b = newNodeI(nkBracketExpr, n.info)
       for i in 1..<n.len: b.add(n[i])
       result = semTypeNode(c, b, prev)
-    elif ident != nil and ident.id == ord(wDotDot):
-      result = semRangeAux(c, n, prev)
+    #elif ident != nil and ident.id == ord(wDotDot):
+    #  result = semRangeAux(c, n, prev)
     elif n[0].kind == nkNilLit and n.len == 2:
       result = semTypeNode(c, n[1], prev)
       if result.skipTypes({tyGenericInst, tyAlias, tySink, tyOwned}).kind in NilableTypes+GenericTypes:
@@ -1851,7 +1879,6 @@ proc semTypeNode(c: PContext, n: PNode, prev: PType): PType =
     of mArray: result = semArray(c, n, prev)
     of mOpenArray: result = semContainer(c, n, tyOpenArray, "openarray", prev)
     of mUncheckedArray: result = semContainer(c, n, tyUncheckedArray, "UncheckedArray", prev)
-    of mHSlice: result = semContainer(c, n, tyUncheckedArray, "UncheckedArray", prev)
     of mRange: result = semRange(c, n, prev)
     of mSet: result = semSet(c, n, prev)
     of mOrdinal: result = semOrdinal(c, n, prev)
@@ -2063,8 +2090,6 @@ proc processMagicType(c: PContext, m: PSym) =
     setMagicType(c.config, m, tyOpenArray, szUncomputedSize)
   of mVarargs:
     setMagicType(c.config, m, tyVarargs, szUncomputedSize)
-  of mHSlice:
-    setMagicType(c.config, m, tyHSlice, szUncomputedSize)
   of mRange:
     setMagicIntegral(c.config, m, tyRange, szUncomputedSize)
     rawAddSon(m.typ, newTypeS(tyNone, c))

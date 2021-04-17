@@ -302,7 +302,9 @@ type
   varargs*[T]{.magic: "Varargs".}     ## Generic type to construct a varargs type.
   seq*[T]{.magic: "Seq".}             ## Generic type to construct sequences.
   set*[T]{.magic: "Set".}             ## Generic type to construct bit sets.
-  HSlice*[T, U]{.magic: "HSlice".}     ## "Heterogeneous" slice type.
+  HSlice*[T, U] = object              ## "Heterogeneous" slice type.
+    a*: T
+    b*: U
 
 type
   UncheckedArray*[T]{.magic: "UncheckedArray".}

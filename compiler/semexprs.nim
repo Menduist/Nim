@@ -2414,7 +2414,7 @@ proc semSetConstr(c: PContext, n: PNode): PNode =
     # only semantic checking for all elements, later type checking:
     var typ: PType = nil
     for i in 0..<n.len:
-      if isRange(n[i]):
+      if isRange(c,n[i]):
         checkSonsLen(n[i], 3, c.config)
         n[i][1] = semExprWithType(c, n[i][1])
         n[i][2] = semExprWithType(c, n[i][2])
@@ -2440,7 +2440,7 @@ proc semSetConstr(c: PContext, n: PNode): PNode =
     for i in 0..<n.len:
       var m: PNode
       let info = n[i].info
-      if isRange(n[i]):
+      if isRange(c, n[i]):
         m = newNodeI(nkRange, info)
         m.add fitNode(c, typ, n[i][1], info)
         m.add fitNode(c, typ, n[i][2], info)
@@ -2979,6 +2979,7 @@ proc semExpr(c: PContext, n: PNode, flags: TExprFlags = {}): PNode =
       localError(c.config, n.info, "invalid context for 'bind' statement: " &
                 renderTree(n, {renderNoComments}))
   else:
+    echo n.kind
     localError(c.config, n.info, "invalid expression: " &
                renderTree(n, {renderNoComments}))
   if result != nil: incl(result.flags, nfSem)

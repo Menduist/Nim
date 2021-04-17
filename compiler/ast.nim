@@ -374,7 +374,6 @@ type
     tyTuple,
     tySet,
     tyRange,
-    tyHSlice,
     tyPtr, tyRef,
     tyVar,
     tySequence,
@@ -667,7 +666,7 @@ type
     mNewString, mNewStringOfCap, mParseBiggestFloat,
     mMove, mWasMoved, mDestroy,
     mDefault, mUnown, mIsolate, mAccessEnv, mReset,
-    mArray, mOpenArray, mRange, mSet, mSeq, mVarargs, mHSlice,
+    mArray, mOpenArray, mRange, mSet, mSeq, mVarargs,
     mRef, mPtr, mVar, mDistinct, mVoid, mTuple,
     mOrdinal, mIterableType,
     mInt, mInt8, mInt16, mInt32, mInt64,
@@ -1004,7 +1003,7 @@ const
   ConcreteTypes*: TTypeKinds = { # types of the expr that may occur in::
                                  # var x = expr
     tyBool, tyChar, tyEnum, tyArray, tyObject,
-    tySet, tyTuple, tyRange, tyHSlice, tyPtr, tyRef, tyVar, tyLent, tySequence, tyProc,
+    tySet, tyTuple, tyRange, tyPtr, tyRef, tyVar, tyLent, tySequence, tyProc,
     tyPointer,
     tyOpenArray, tyString, tyCstring, tyInt..tyInt64, tyFloat..tyFloat128,
     tyUInt..tyUInt64}
