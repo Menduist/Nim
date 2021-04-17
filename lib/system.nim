@@ -302,6 +302,7 @@ type
   varargs*[T]{.magic: "Varargs".}     ## Generic type to construct a varargs type.
   seq*[T]{.magic: "Seq".}             ## Generic type to construct sequences.
   set*[T]{.magic: "Set".}             ## Generic type to construct bit sets.
+  HSlice*[T, U]{.magic: "HSlice".}     ## "Heterogeneous" slice type.
 
 type
   UncheckedArray*[T]{.magic: "UncheckedArray".}
@@ -493,9 +494,6 @@ proc `=sink`*[T](x: var T; y: T) {.inline, magic: "Asgn".} =
   shallowCopy(x, y)
 
 type
-  HSlice*[T, U] = object   ## "Heterogeneous" slice type.
-    a*: T                  ## The lower bound (inclusive).
-    b*: U                  ## The upper bound (inclusive).
   Slice*[T] = HSlice[T, T] ## An alias for `HSlice[T, T]`.
 
   BackwardsIndex* = distinct int ## Type that is constructed by `^` for

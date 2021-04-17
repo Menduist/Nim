@@ -1851,6 +1851,7 @@ proc semTypeNode(c: PContext, n: PNode, prev: PType): PType =
     of mArray: result = semArray(c, n, prev)
     of mOpenArray: result = semContainer(c, n, tyOpenArray, "openarray", prev)
     of mUncheckedArray: result = semContainer(c, n, tyUncheckedArray, "UncheckedArray", prev)
+    of mHSlice: result = semContainer(c, n, tyUncheckedArray, "UncheckedArray", prev)
     of mRange: result = semRange(c, n, prev)
     of mSet: result = semSet(c, n, prev)
     of mOrdinal: result = semOrdinal(c, n, prev)
@@ -2062,6 +2063,8 @@ proc processMagicType(c: PContext, m: PSym) =
     setMagicType(c.config, m, tyOpenArray, szUncomputedSize)
   of mVarargs:
     setMagicType(c.config, m, tyVarargs, szUncomputedSize)
+  of mHSlice:
+    setMagicType(c.config, m, tyHSlice, szUncomputedSize)
   of mRange:
     setMagicIntegral(c.config, m, tyRange, szUncomputedSize)
     rawAddSon(m.typ, newTypeS(tyNone, c))
