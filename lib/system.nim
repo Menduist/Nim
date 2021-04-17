@@ -498,6 +498,10 @@ type
     b*: U                  ## The upper bound (inclusive).
   Slice*[T] = HSlice[T, T] ## An alias for `HSlice[T, T]`.
 
+  BackwardsIndex* = distinct int ## Type that is constructed by `^` for
+                                 ## reversed array accesses.
+                                 ## (See `^ template <#^.t,int>`_)
+
 proc `..`*[T, U](a: sink T, b: sink U): HSlice[T, U] {.noSideEffect, inline, magic: "DotDot".} =
   ## Binary `slice`:idx: operator that constructs an interval `[a, b]`, both `a`
   ## and `b` are inclusive.
@@ -519,6 +523,36 @@ when defined(nimLegacyUnarySlice):
     ##   let a = [10, 20, 30, 40, 50]
     ##   echo a[.. 2] # @[10, 20, 30]
     result = HSlice[int, T](a: 0, b: b)
+
+template `^`*(x: int): BackwardsIndex = BackwardsIndex(x)
+  ## Builtin `roof`:idx: operator that can be used for convenient array access.
+  ## `a[^x]` is a shortcut for `a[a.len-x]`.
+  ##
+  ## .. code-block:: Nim
+  ##   let
+  ##     a = [1, 3, 5, 7, 9]
+  ##     b = "abcdefgh"
+  ##
+  ##   echo a[^1] # => 9
+  ##   echo b[^2] # => g
+
+
+template `..^`*(a, b: untyped): untyped =
+  ## A shortcut for `.. ^` to avoid the common gotcha that a space between
+  ## '..' and '^' is required.
+  a .. ^b
+
+template `..<`*(a, b: untyped): untyped =
+  ## A shortcut for `a .. pred(b)`.
+  ##
+  ## .. code-block:: Nim
+  ##   for i in 5 ..< 9:
+  ##     echo i # => 5; 6; 7; 8
+  when b is (uint|uint8|uint16|uint32|uint64):
+    if b == 0: a + 1 .. type(b)(0) #TODO do better
+    else: a .. pred(b)
+  else:
+    a .. (when b is BackwardsIndex: succ(b) else: pred(b))
 
 when defined(hotCodeReloading):
   {.pragma: hcrInline, inline.}
@@ -2502,36 +2536,6 @@ proc `/`*(x, y: int): float {.inline, noSideEffect.} =
   ## .. code-block:: Nim
   ##   echo 7 / 5 # => 1.4
   result = toFloat(x) / toFloat(y)
-
-type
-  BackwardsIndex* = distinct int ## Type that is constructed by `^` for
-                                 ## reversed array accesses.
-                                 ## (See `^ template <#^.t,int>`_)
-
-template `^`*(x: int): BackwardsIndex = BackwardsIndex(x)
-  ## Builtin `roof`:idx: operator that can be used for convenient array access.
-  ## `a[^x]` is a shortcut for `a[a.len-x]`.
-  ##
-  ## .. code-block:: Nim
-  ##   let
-  ##     a = [1, 3, 5, 7, 9]
-  ##     b = "abcdefgh"
-  ##
-  ##   echo a[^1] # => 9
-  ##   echo b[^2] # => g
-
-template `..^`*(a, b: untyped): untyped =
-  ## A shortcut for `.. ^` to avoid the common gotcha that a space between
-  ## '..' and '^' is required.
-  a .. ^b
-
-template `..<`*(a, b: untyped): untyped =
-  ## A shortcut for `a .. pred(b)`.
-  ##
-  ## .. code-block:: Nim
-  ##   for i in 5 ..< 9:
-  ##     echo i # => 5; 6; 7; 8
-  a .. (when b is BackwardsIndex: succ(b) else: pred(b))
 
 template spliceImpl(s, a, L, b: untyped): untyped =
   # make room for additional elements or cut:
