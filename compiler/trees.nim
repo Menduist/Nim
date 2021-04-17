@@ -119,22 +119,6 @@ proc isDeepConstExpr*(n: PNode; preventInheritance = false): bool =
         result = true
   else: discard
 
-#proc isRange*(c: PContext, n: PNode): bool {.inline.} =
-#  if n.kind in nkCallKinds:
-#    echo semExprWithType(c, n, {efDetermineType})
-#
-proc isRange*(n: PNode): bool {.inline.} =
-  discard
-  #if n.kind in nkCallKinds:
-    #echo n.kind
-    #result = false
-    #let callee = n[0]
-    #if (callee.kind == nkIdent and callee.ident.id == ord(wDotDot)) or
-    #   (callee.kind == nkSym and callee.sym.name.id == ord(wDotDot)) or
-    #   (callee.kind in {nkClosedSymChoice, nkOpenSymChoice} and
-    #    callee[1].sym.name.id == ord(wDotDot)):
-    #  result = true
-
 proc whichPragma*(n: PNode): TSpecialWord =
   let key = if n.kind in nkPragmaCallKinds and n.len > 0: n[0] else: n
   case key.kind

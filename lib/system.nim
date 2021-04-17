@@ -502,7 +502,13 @@ type
                                  ## reversed array accesses.
                                  ## (See `^ template <#^.t,int>`_)
 
-proc `..`*[T, U](a: sink T, b: sink U): HSlice[T, U] {.noSideEffect, inline, magic: "DotDot".} =
+{.push profiler: off.}
+let nimvm* {.magic: "Nimvm", compileTime.}: bool = false
+  ## May be used only in `when` expression.
+  ## It is true in Nim VM context and false otherwise.
+{.pop.}
+
+proc `..`*[T, U](a: sink T, b: sink U): HSlice[T, U] {.noSideEffect, inline.} =
   ## Binary `slice`:idx: operator that constructs an interval `[a, b]`, both `a`
   ## and `b` are inclusive.
   ##
@@ -515,14 +521,14 @@ proc `..`*[T, U](a: sink T, b: sink U): HSlice[T, U] {.noSideEffect, inline, mag
   result = HSlice[T, U](a: a, b: b)
 
 when defined(nimLegacyUnarySlice):
-  proc `..`*[T](b: sink T): HSlice[int, T]
-    {.noSideEffect, inline, magic: "DotDot", deprecated: "replace `..b` with `0..b`".} =
-    ## Unary `slice`:idx: operator that constructs an interval `[default(int), b]`.
-    ##
-    ## .. code-block:: Nim
-    ##   let a = [10, 20, 30, 40, 50]
-    ##   echo a[.. 2] # @[10, 20, 30]
-    result = HSlice[int, T](a: 0, b: b)
+proc `..`*[T](b: sink T): HSlice[int, T]
+    {.noSideEffect, inline, deprecated: "replace `..b` with `0..b`".} =
+  ## Unary `slice`:idx: operator that constructs an interval `[default(int), b]`.
+  ##
+  ## .. code-block:: Nim
+  ##   let a = [10, 20, 30, 40, 50]
+  ##   echo a[.. 2] # @[10, 20, 30]
+  0 .. b
 
 template `^`*(x: int): BackwardsIndex = BackwardsIndex(x)
   ## Builtin `roof`:idx: operator that can be used for convenient array access.
@@ -558,12 +564,6 @@ when defined(hotCodeReloading):
   {.pragma: hcrInline, inline.}
 else:
   {.pragma: hcrInline.}
-
-{.push profiler: off.}
-let nimvm* {.magic: "Nimvm", compileTime.}: bool = false
-  ## May be used only in `when` expression.
-  ## It is true in Nim VM context and false otherwise.
-{.pop.}
 
 include "system/arithmetics"
 include "system/comparisons"

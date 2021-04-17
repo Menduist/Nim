@@ -217,7 +217,7 @@ proc semDistinct(c: PContext, n: PNode, prev: PType): PType =
   addSonSkipIntLit(result, semTypeNode(c, n[0], nil), c.idgen)
   if n.len > 1: result.n = n[1]
 
-proc isRange*(c: PContext, n: PNode): bool {.inline.} =
+proc isSlice*(c: PContext, n: PNode): bool {.inline.} =
   if n.kind == nkIdent: return false
   let e = semExprWithType(c, n, {efDetermineType})
   if e == nil:
@@ -226,7 +226,7 @@ proc isRange*(c: PContext, n: PNode): bool {.inline.} =
   result = e.typ.skipTypes({tyGenericInst, tyAlias}).typeToString() == "HSlice"
 
 proc semRangeAux(c: PContext, n: PNode, prev: PType): PType =
-  assert isRange(c, n)
+  assert isSlice(c, n)
   checkSonsLen(n, 3, c.config)
   result = newOrPrevType(tyRange, prev, c)
   result.n = newNodeI(nkRange, n.info)
@@ -296,7 +296,7 @@ proc semRange(c: PContext, n: PNode, prev: PType): PType =
   #echo e.typ.skipTypes({tyGenericInst, tyAlias}).typeToString() == "HSlice"
   #echo semTypeNode(c, n[1], nil).kind
   if n.len == 2:
-    if isRange(c, n[1]):
+    if isSlice(c, n[1]):
       result = semRangeAux(c, n[1], prev)
       let n = result.n
       if n[0].kind in {nkCharLit..nkUInt64Lit} and n[0].intVal > 0:
@@ -320,7 +320,7 @@ proc semRange(c: PContext, n: PNode, prev: PType): PType =
     result = newOrPrevType(tyError, prev, c)
 
 proc semArrayIndex(c: PContext, n: PNode): PType =
-  if isRange(c, n):
+  if isSlice(c, n):
     result = semRangeAux(c, n, nil)
   else:
     let e = semExprWithType(c, n, {efDetermineType})
@@ -577,7 +577,7 @@ proc semCaseBranchSetElem(c: PContext, t, b: PNode,
   if b.kind == nkRange:
     checkSonsLen(b, 2, c.config)
     result = semBranchRange(c, t, b[0], b[1], covered)
-  elif isRange(c, b):
+  elif isSlice(c, b):
     checkSonsLen(b, 3, c.config)
     result = semBranchRange(c, t, b[1], b[2], covered)
   else:
@@ -591,7 +591,7 @@ proc semCaseBranch(c: PContext, t, branch: PNode, branchIndex: int,
     var b = branch[i]
     if b.kind == nkRange:
       branch[i] = b
-    elif isRange(c, b):
+    elif isSlice(c, b):
       branch[i] = semCaseBranchRange(c, t, b, covered)
     else:
       # constant sets and arrays are allowed:

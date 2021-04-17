@@ -2414,7 +2414,7 @@ proc semSetConstr(c: PContext, n: PNode): PNode =
     # only semantic checking for all elements, later type checking:
     var typ: PType = nil
     for i in 0..<n.len:
-      if isRange(c,n[i]):
+      if isSlice(c,n[i]):
         checkSonsLen(n[i], 3, c.config)
         n[i][1] = semExprWithType(c, n[i][1])
         n[i][2] = semExprWithType(c, n[i][2])
@@ -2440,7 +2440,7 @@ proc semSetConstr(c: PContext, n: PNode): PNode =
     for i in 0..<n.len:
       var m: PNode
       let info = n[i].info
-      if isRange(c, n[i]):
+      if isSlice(c, n[i]):
         m = newNodeI(nkRange, info)
         m.add fitNode(c, typ, n[i][1], info)
         m.add fitNode(c, typ, n[i][2], info)
