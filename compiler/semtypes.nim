@@ -223,7 +223,8 @@ proc isSlice*(c: PContext, n: PNode): bool {.inline.} =
   if e == nil:
     return false
   #let e = semExprWithType(c, n[1], {efDetermineType})
-  result = e.typ.skipTypes({tyGenericInst, tyAlias}).typeToString() == "HSlice"
+  let typ = e.typ.skipTypes({tyGenericInst, tyAlias})
+  result = typ.typeToString() == "HSlice" ##TODO switch to magic
 
 proc semRangeAux(c: PContext, n: PNode, prev: PType): PType =
   assert isSlice(c, n)
@@ -275,26 +276,6 @@ proc semRangeAux(c: PContext, n: PNode, prev: PType): PType =
 
 proc semRange(c: PContext, n: PNode, prev: PType): PType =
   result = nil
-  #if isRange(c, n[1]):
-  #  result = semRangeAux(c, n[1], prev)
-  #  echo result
-    #let e = tryConstExpr(c, n[1])
-    #result = newOrPrevType(tyRange, prev, c)
-    #result.n = newNodeI(nkRange, n.info)
-    #result.n.add e.sons[1].sons[1]
-    #result.n.add e.sons[2].sons[1]
-  #else:
-  #  result = newOrPrevType(tyError, prev, c)
-
-  #return result
-  #let e = semExprWithType(c, n[1], {efDetermineType})
-  #let e = tryConstExpr(c, n[1])
-  #echo e.kind
-  #echo e.typ
-  #echo e.typ.kind
-  #echo repr e.typ.skipTypes({tyGenericInst, tyAlias})
-  #echo e.typ.skipTypes({tyGenericInst, tyAlias}).typeToString() == "HSlice"
-  #echo semTypeNode(c, n[1], nil).kind
   if n.len == 2:
     if isSlice(c, n[1]):
       result = semRangeAux(c, n[1], prev)
@@ -310,10 +291,7 @@ proc semRange(c: PContext, n: PNode, prev: PType): PType =
           n[1].floatVal < 0.0:
         incl(result.flags, tfRequiresInit)
     else:
-      if n[1].kind == nkInfix and considerQuotedIdent(c, n[1][0]).s == "..<":
-        localError(c.config, n[0].info, "range types need to be constructed with '..', '..<' is not supported")
-      else:
-        localError(c.config, n[0].info, "expected range")
+      localError(c.config, n[0].info, "expected range")
       result = newOrPrevType(tyError, prev, c)
   else:
     localError(c.config, n.info, errXExpectsOneTypeParam % "range")
@@ -1772,8 +1750,6 @@ proc semTypeNode(c: PContext, n: PNode, prev: PType): PType =
       let b = newNodeI(nkBracketExpr, n.info)
       for i in 1..<n.len: b.add(n[i])
       result = semTypeNode(c, b, prev)
-    #elif ident != nil and ident.id == ord(wDotDot):
-    #  result = semRangeAux(c, n, prev)
     elif n[0].kind == nkNilLit and n.len == 2:
       result = semTypeNode(c, n[1], prev)
       if result.skipTypes({tyGenericInst, tyAlias, tySink, tyOwned}).kind in NilableTypes+GenericTypes:

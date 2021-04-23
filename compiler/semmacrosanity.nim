@@ -80,7 +80,6 @@ proc annotateType*(n: PNode, t: PType; conf: ConfigRef) =
       n.typ = t
       for m in n: annotateType(m, x.elemType, conf)
     else:
-      echo x.kind
       globalError(conf, n.info, "{} must have the set type")
   of nkFloatLit..nkFloat128Lit:
     if x.kind in {tyFloat..tyFloat128}:

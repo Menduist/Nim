@@ -479,7 +479,8 @@ proc filter*[T](s: openArray[T], pred: proc(x: T): bool {.closure.}): seq[T]
     if pred(s[i]):
       result.add(s[i])
 
-proc keepIf*[T](s: var seq[T], pred: proc(x: T): bool {.closure.}) =
+proc keepIf*[T](s: var seq[T], pred: proc(x: T): bool {.closure.})
+                                                                {.inline.} =
   ## Keeps the items in the passed sequence `s` if they fulfill the
   ## predicate `pred` (a function that returns a `bool`).
   ##

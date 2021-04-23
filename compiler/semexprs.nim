@@ -2979,7 +2979,6 @@ proc semExpr(c: PContext, n: PNode, flags: TExprFlags = {}): PNode =
       localError(c.config, n.info, "invalid context for 'bind' statement: " &
                 renderTree(n, {renderNoComments}))
   else:
-    echo n.kind
     localError(c.config, n.info, "invalid expression: " &
                renderTree(n, {renderNoComments}))
   if result != nil: incl(result.flags, nfSem)
