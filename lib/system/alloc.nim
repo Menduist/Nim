@@ -740,6 +740,10 @@ when false:
       else:
         result = nil
 
+when defined(heaptracker):
+  proc heaptrack_malloc(a: pointer, size: int) {.cdecl, importc, dynlib:"libheaptrack_preload.so".}
+  proc heaptrack_free(a: pointer) {.cdecl, importc, dynlib:"libheaptrack_preload.so".}
+
 proc rawAlloc(a: var MemRegion, requestedSize: int): pointer =
   when defined(nimTypeNames):
     inc(a.allocCounter)
@@ -812,6 +816,9 @@ proc rawAlloc(a: var MemRegion, requestedSize: int): pointer =
   sysAssert(allocInv(a), "rawAlloc: end")
   when logAlloc: cprintf("var pointer_%p = alloc(%ld)\n", result, requestedSize)
 
+  when defined(heaptracker):
+    heaptrack_malloc(result, requestedSize)
+
 proc rawAlloc0(a: var MemRegion, requestedSize: int): pointer =
   result = rawAlloc(a, requestedSize)
   zeroMem(result, requestedSize)
@@ -819,6 +826,8 @@ proc rawAlloc0(a: var MemRegion, requestedSize: int): pointer =
 proc rawDealloc(a: var MemRegion, p: pointer) =
   when defined(nimTypeNames):
     inc(a.deallocCounter)
+  when defined(heaptracker):
+    heaptrack_free(p)
   #sysAssert(isAllocatedPtr(a, p), "rawDealloc: no allocated pointer")
   sysAssert(allocInv(a), "rawDealloc: begin")
   var c = pageAddr(p)
