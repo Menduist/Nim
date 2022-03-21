@@ -1203,7 +1203,7 @@ proc formatDigits*(buffer: var openArray[char]; pos: int; digits: uint64; decima
   let useFixed: bool = minFixedDecimalPoint <= decimalPoint and
       decimalPoint <= maxFixedDecimalPoint
   ## Prepare the buffer.
-  for i in 0..<32: buffer[pos+i] = '0'
+  for i in countup(0, 31): buffer[pos+i] = '0'
   assert(minFixedDecimalPoint >= -30, "internal error")
   assert(maxFixedDecimalPoint <= 32, "internal error")
   var decimalDigitsPosition: int32
@@ -1234,8 +1234,8 @@ proc formatDigits*(buffer: var openArray[char]; pos: int; digits: uint64; decima
         ##  VC does not inline the memmove call below. (Even if compiled with /arch:AVX2.)
         ##  However, memcpy will be inlined.
         var tmp: array[16, char]
-        for i in 0..<16: tmp[i] = buffer[i+pos+decimalPoint]
-        for i in 0..<16: buffer[i+pos+decimalPoint+1] = tmp[i]
+        for i in countup(0, 15): tmp[i] = buffer[i+pos+decimalPoint]
+        for i in countup(0, 15): buffer[i+pos+decimalPoint+1] = tmp[i]
       else:
         memmove(buffer +! (decimalPoint + 1), buffer +! decimalPoint, 16)
       buffer[pos+decimalPoint] = '.'

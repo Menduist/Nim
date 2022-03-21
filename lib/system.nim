@@ -2545,7 +2545,11 @@ template `..<`*(a, b: untyped): untyped =
   ## .. code-block:: Nim
   ##   for i in 5 ..< 9:
   ##     echo i # => 5; 6; 7; 8
-  a .. (when b is BackwardsIndex: succ(b) else: pred(b))
+  when b is (uint|uint8|uint16|uint32|uint64):
+    if b == 0: a + 1 .. type(b)(0) #TODO do better
+    else: a .. pred(b)
+  else:
+    a .. (when b is BackwardsIndex: succ(b) else: pred(b))
 
 template spliceImpl(s, a, L, b: untyped): untyped =
   # make room for additional elements or cut:

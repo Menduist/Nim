@@ -43,7 +43,7 @@ func addChars[T](result: var string, x: T, start: int, n: int) {.inline.} =
   let old = result.len
   result.setLen old + n
   template impl =
-    for i in 0..<n: result[old + i] = x[start + i]
+    for i in countup(0, pred(n)): result[old + i] = x[start + i]
   when nimvm: impl
   else:
     when defined(js) or defined(nimscript): impl

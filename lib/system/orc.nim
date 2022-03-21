@@ -332,12 +332,12 @@ proc collectCyclesBacon(j: var GcEnv; lowMark: int) =
       scan(roots.d[i][0], roots.d[i][1], j)
 
   init j.toFree
-  for i in 0 ..< roots.len:
+  for i in countup(0, roots.len - 1):
     let s = roots.d[i][0]
     s.rootIdx = 0
     collectColor(s, roots.d[i][1], colToCollect, j)
 
-  for i in 0 ..< j.toFree.len:
+  for i in countup(0, j.toFree.len - 1):
     free(j.toFree.d[i][0], j.toFree.d[i][1])
 
   inc j.freed, j.toFree.len

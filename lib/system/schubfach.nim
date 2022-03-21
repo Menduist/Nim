@@ -332,7 +332,7 @@ proc formatDigits(buffer: var openArray[char]; pos: int; digits: uint32; decimal
       decimalPoint <= maxFixedDecimalPoint
   ##  Prepare the buffer.
   ##  Avoid calling memset/memcpy with variable arguments below...
-  for i in 0..<32: buffer[pos+i] = '0'
+  for i in countup(0, 31): buffer[pos+i] = '0'
   assert(minFixedDecimalPoint >= -30, "internal error")
   assert(maxFixedDecimalPoint <= 32, "internal error")
   var decimalDigitsPosition: int32

@@ -126,7 +126,13 @@ iterator items*[T: enum and Ordinal](E: typedesc[T]): T =
 iterator items*[T: Ordinal](s: Slice[T]): T =
   ## Iterates over the slice `s`, yielding each value between `s.a` and `s.b`
   ## (inclusively).
-  for x in s.a .. s.b:
+  for x in countup(s.a, s.b):
+    yield x
+
+iterator items*[T: Ordinal, U: Ordinal](s: HSlice[T, U]): T =
+  ## Iterates over the slice `s`, yielding each value between `s.a` and `s.b`
+  ## (inclusively).
+  for x in countup(s.a, T(s.b)):
     yield x
 
 iterator pairs*[T](a: openArray[T]): tuple[key: int, val: T] {.inline.} =
