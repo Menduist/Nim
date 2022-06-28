@@ -29,6 +29,7 @@ end
 9018
 @[1, 2]
 @[1, 2, 3]
+In defer
 '''
 """
 
@@ -274,3 +275,14 @@ iterator cc() {.closure.} =
             break
 
 var a2 = cc
+
+# bug #18824
+iterator poc_iterator: int {.closure.}  =
+  block:
+    try:
+      break
+    finally:
+      echo "In defer"
+
+for _ in poc_iterator():
+  discard
