@@ -1350,6 +1350,8 @@ proc preprocess(c: var PreprocessContext; n: PNode): PNode =
   # detect: 'finally: raises X' which is currently not supported. We produce
   # an error for this case for now. All this will be done properly with Yuriy's
   # patch.
+
+  if n.hasYields == false: return n
   result = n
   case n.kind
   of nkTryStmt:
