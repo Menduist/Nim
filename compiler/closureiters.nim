@@ -143,6 +143,8 @@ type
     stateVarSym: PSym # :state variable. nil if env already introduced by lambdalifting
     tmpResultSym: PSym # Used when we return, but finally has to interfere
     unrollFinallySym: PSym # Indicates that we're unrolling finally states (either exception happened or premature return)
+    unrollUntilSym: PSym
+    afterUnrollSym: PSym
     curExcSym: PSym # Current exception
 
     states: seq[PNode] # The resulting states. Every state is an nkState node.
@@ -156,6 +158,8 @@ type
     curExcHandlingState: int # Negative for except, positive for finally
     nearestFinally: int # Index of the nearest finally block. For try/except it
                     # is their finally. For finally it is parent finally. Otherwise -1
+    nearestBreakableScope: int
+    breakableScopes: Table[int, (int, int)]
     idgen: IdGenerator
 
 const
@@ -211,6 +215,16 @@ proc newUnrollFinallyAccess(ctx: var Ctx, info: TLineInfo): PNode =
     ctx.unrollFinallySym = ctx.newEnvVar(":unrollFinally", ctx.g.getSysType(info, tyBool))
   ctx.newEnvVarAccess(ctx.unrollFinallySym)
 
+proc newUnrollUntilAccess(ctx: var Ctx, info: TLineInfo): PNode =
+  if ctx.unrollUntilSym.isNil:
+    ctx.unrollUntilSym = ctx.newEnvVar(":unrollUntil", ctx.g.getSysType(info, tyInt))
+  ctx.newEnvVarAccess(ctx.unrollUntilSym)
+
+proc newAfterUnrollAccess(ctx: var Ctx, info: TLineInfo): PNode =
+  if ctx.afterUnrollSym.isNil:
+    ctx.afterUnrollSym = ctx.newEnvVar(":afterUnroll", ctx.g.getSysType(info, tyInt))
+  ctx.newEnvVarAccess(ctx.afterUnrollSym)
+
 proc newCurExcAccess(ctx: var Ctx): PNode =
   if ctx.curExcSym.isNil:
     ctx.curExcSym = ctx.newEnvVar(":curExc", ctx.g.callCodegenProc("getCurrentException").typ)
@@ -262,44 +276,18 @@ proc hasYields(n: PNode): bool =
         result = true
         break
 
-proc transformBreaksAndContinuesInWhile(ctx: var Ctx, n: PNode, before, after: PNode): PNode =
-  result = n
+proc hasControlFlow(n: PNode): bool =
+  # TODO: This is very inefficient. It traverses the node, looking for nkYieldStmt.
   case n.kind
+  of nkYieldStmt, nkBreakStmt:
+    result = true
   of nkSkip:
     discard
-  of nkWhileStmt: discard # Do not recurse into nested whiles
-  of nkContinueStmt:
-    result = before
-  of nkBlockStmt:
-    inc ctx.blockLevel
-    result[1] = ctx.transformBreaksAndContinuesInWhile(result[1], before, after)
-    dec ctx.blockLevel
-  of nkBreakStmt:
-    if ctx.blockLevel == 0:
-      result = after
   else:
-    for i in 0..<n.len:
-      n[i] = ctx.transformBreaksAndContinuesInWhile(n[i], before, after)
-
-proc transformBreaksInBlock(ctx: var Ctx, n: PNode, label, after: PNode): PNode =
-  result = n
-  case n.kind
-  of nkSkip:
-    discard
-  of nkBlockStmt, nkWhileStmt:
-    inc ctx.blockLevel
-    result[1] = ctx.transformBreaksInBlock(result[1], label, after)
-    dec ctx.blockLevel
-  of nkBreakStmt:
-    if n[0].kind == nkEmpty:
-      if ctx.blockLevel == 0:
-        result = after
-    else:
-      if label.kind == nkSym and n[0].sym == label.sym:
-        result = after
-  else:
-    for i in 0..<n.len:
-      n[i] = ctx.transformBreaksInBlock(n[i], label, after)
+    for c in n:
+      if c.hasControlFlow:
+        result = true
+        break
 
 proc newNullifyCurExc(ctx: var Ctx, info: TLineInfo): PNode =
   # :curEcx = nil
@@ -414,7 +402,6 @@ proc exprToStmtList(n: PNode): tuple[s, res: PNode] =
     n = n[^1]
 
   result.res = n
-
 
 proc newEnvVarAsgn(ctx: Ctx, s: PSym, v: PNode): PNode =
   if isEmptyType(v.typ):
@@ -764,14 +751,23 @@ proc lowerStmtListExprs(ctx: var Ctx, n: PNode, needsSplit: var bool): PNode =
       needsSplit = true
 
       if condNeedsSplit:
+        # need to wrap in a block to allow named breaking
+        let blockSym = newSymNode(newSym(skVar, getIdent(ctx.g.cache, "breaker"), nextSymId(ctx.idgen), ctx.fn, ctx.fn.info))
         let (st, ex) = exprToStmtList(n[0])
-        let brk = newTree(nkBreakStmt, ctx.g.emptyNode)
+        let brk = newTree(nkBreakStmt, blockSym)
         let branch = newTree(nkElifBranch, ctx.g.newNotCall(ex), brk)
         let check = newTree(nkIfStmt, branch)
         let newBody = newTree(nkStmtList, st, check, n[1])
 
         n[0] = newSymNode(ctx.g.getSysSym(n[0].info, "true"))
         n[1] = newBody
+        result = newTree(
+          nkBlockStmt,
+          blockSym,
+          newTree(nkWhileStmt,
+            newSymNode(ctx.g.getSysSym(n[0].info, "true")),
+            newBody)
+        )
 
   of nkDotExpr, nkCheckedFieldExpr:
     var ns = false
@@ -832,7 +828,19 @@ proc newEndFinallyNode(ctx: var Ctx, info: TLineInfo): PNode =
   let ifBody = newTree(nkIfStmt, branch, elseBranch)
   let elifBranch = newTree(nkElifBranch, ctx.newUnrollFinallyAccess(info), ifBody)
   elifBranch.info = info
-  result = newTree(nkIfStmt, elifBranch)
+
+  let cmp1 = newTree(nkCall, newSymNode(ctx.g.getSysMagic(info, "==", mEqRef), info), ctx.newUnrollUntilAccess(info), ctx.g.newIntLit(info, ctx.nearestFinally))
+  cmp1.typ = ctx.g.getSysType(info, tyBool)
+  let bod1 =
+    newTree(nkStmtList,
+      newTree(nkAsgn, ctx.newUnrollFinallyAccess(info), newIntTypeNode(0, ctx.g.getSysType(info, tyBool))),
+      newTree(nkAsgn, ctx.newUnrollUntilAccess(info), newIntTypeNode(0, ctx.g.getSysType(info, tyInt))),
+      newTree(nkGotoState, ctx.newAfterUnrollAccess(info))
+    )
+  result = newTree(nkStmtList,
+    newTree(nkIfStmt, newTree(nkElifBranch, cmp1, bod1)),
+    newTree(nkIfStmt, elifBranch)
+  )
 
 proc transformReturnsInTry(ctx: var Ctx, n: PNode): PNode =
   result = n
@@ -870,13 +878,14 @@ proc transformReturnsInTry(ctx: var Ctx, n: PNode): PNode =
 
 proc transformClosureIteratorBody(ctx: var Ctx, n: PNode, gotoOut: PNode): PNode =
   result = n
+
   case n.kind
   of nkSkip: discard
 
   of nkStmtList, nkStmtListExpr:
     result = addGotoOut(result, gotoOut)
     for i in 0..<n.len:
-      if n[i].hasYields:
+      if n[i].hasControlFlow:
         # Create a new split
         let go = newNodeI(nkGotoState, n[i].info)
         n[i] = ctx.transformClosureIteratorBody(n[i], go)
@@ -934,7 +943,6 @@ proc transformClosureIteratorBody(ctx: var Ctx, n: PNode, gotoOut: PNode): PNode
 
     var body = addGotoOut(n[1], result)
 
-    body = ctx.transformBreaksAndContinuesInWhile(body, result, gotoOut)
     body = ctx.transformClosureIteratorBody(body, result)
 
     elifBranch.add(body)
@@ -945,9 +953,36 @@ proc transformClosureIteratorBody(ctx: var Ctx, n: PNode, gotoOut: PNode): PNode
     s.add(ifNode)
 
   of nkBlockStmt:
-    result[1] = addGotoOut(result[1], gotoOut)
-    result[1] = ctx.transformBreaksInBlock(result[1], result[0], gotoOut)
-    result[1] = ctx.transformClosureIteratorBody(result[1], gotoOut)
+    let
+      previousNearestBreakableScope = ctx.nearestBreakableScope
+      # need to create a "trampoline state" since we don't know the gotoOut id yet
+      trampoline = ctx.newState(gotoOut, nil)
+      symId = n[0].sym.id
+    ctx.breakableScopes[symId] = (trampoline, ctx.nearestFinally)
+    ctx.nearestBreakableScope = symId
+
+    #result = newNodeI(nkStmtList, n.info)
+    result = ctx.transformClosureIteratorBody(n[1], gotoOut)
+
+    ctx.nearestBreakableScope = previousNearestBreakableScope
+
+  of nkBreakStmt:
+    result = newNodeI(nkStmtList, n.info)
+    let
+      #TODO is this necessary?
+      # (unnamed break handling)
+      #symId = if n[0].kind == nkSym: n[0].sym.id else: ctx.nearestBreakableScope
+      symId = n[0].sym.id
+      breakableCtx = ctx.breakableScopes[symId]
+    if breakableCtx[1] == ctx.nearestFinally:
+      # No finally in the block, let's just finish it
+      result.add(newTree(nkGotoState, ctx.g.newIntLit(n.info, breakableCtx[0])))
+    else:
+      # Partial unroll
+      result.add(newTree(nkAsgn, ctx.newUnrollFinallyAccess(n.info), newIntTypeNode(1, ctx.g.getSysType(n.info, tyBool))))
+      result.add(newTree(nkAsgn, ctx.newUnrollUntilAccess(n.info), newIntTypeNode(breakableCtx[1], ctx.g.getSysType(n.info, tyInt))))
+      result.add(newTree(nkAsgn, ctx.newAfterUnrollAccess(n.info), newIntTypeNode(breakableCtx[0], ctx.g.getSysType(n.info, tyInt))))
+      result.add(newTree(nkGotoState, ctx.g.newIntLit(n.info, ctx.nearestFinally)))
 
   of nkTryStmt, nkHiddenTryStmt:
     # See explanation above about how this works
@@ -970,6 +1005,7 @@ proc transformClosureIteratorBody(ctx: var Ctx, n: PNode, gotoOut: PNode): PNode
     else:
       exceptIdx = tryIdx + 1
       finallyIdx = tryIdx + 1
+
 
     let outToFinally = newNodeI(nkGotoState, finallyBody.info)
 
@@ -1010,10 +1046,11 @@ proc transformClosureIteratorBody(ctx: var Ctx, n: PNode, gotoOut: PNode): PNode
 
       ctx.curExcHandlingState = oldExcHandlingState
       ctx.nearestFinally = oldNearestFinally
+
       if ctx.transformClosureIteratorBody(finallyBody, gotoOut) != finallyBody:
         internalError(ctx.g.config, "transformClosureIteratorBody != finallyBody")
 
-  of nkGotoState, nkForStmt:
+  of nkGotoState, nkForStmt, nkContinueStmt:
     internalError(ctx.g.config, "closure iter " & $n.kind)
 
   else:
@@ -1077,8 +1114,11 @@ proc transformStateAssignments(ctx: var Ctx, n: PNode): PNode =
     result.add(n)
 
   of nkGotoState:
+    echo renderTree(n)
     result = newNodeI(nkStmtList, n.info)
-    result.add(ctx.newStateAssgn(stateFromGotoState(n)))
+    #TODO
+    #result.add(ctx.newStateAssgn(stateFromGotoState(n)))
+    result.add(ctx.newStateAssgn(n[0]))
 
     let breakState = newNodeI(nkBreakStmt, n.info)
     breakState.add(newSymNode(ctx.stateLoopLabel))
@@ -1297,108 +1337,6 @@ proc deleteEmptyStates(ctx: var Ctx) =
     else:
       inc i
 
-type
-  PreprocessContext = object
-    finallys: seq[PNode]
-    config: ConfigRef
-    blocks: seq[(PNode, int)]
-    idgen: IdGenerator
-  FreshVarsContext = object
-    tab: Table[int, PSym]
-    config: ConfigRef
-    info: TLineInfo
-    idgen: IdGenerator
-
-proc freshVars(n: PNode; c: var FreshVarsContext): PNode =
-  case n.kind
-  of nkSym:
-    let x = c.tab.getOrDefault(n.sym.id)
-    if x == nil:
-      result = n
-    else:
-      result = newSymNode(x, n.info)
-  of nkSkip - {nkSym}:
-    result = n
-  of nkLetSection, nkVarSection:
-    result = copyNode(n)
-    for it in n:
-      if it.kind in {nkIdentDefs, nkVarTuple}:
-        let idefs = copyNode(it)
-        for v in 0..it.len-3:
-          if it[v].kind == nkSym:
-            let x = copySym(it[v].sym, nextSymId(c.idgen))
-            c.tab[it[v].sym.id] = x
-            idefs.add newSymNode(x)
-          else:
-            idefs.add it[v]
-
-        for rest in it.len-2 ..< it.len: idefs.add it[rest]
-        result.add idefs
-      else:
-        result.add it
-  of nkRaiseStmt:
-    localError(c.config, c.info, "unsupported control flow: 'finally: ... raise' duplicated because of 'break'")
-  else:
-    result = n
-    for i in 0..<n.safeLen:
-      result[i] = freshVars(n[i], c)
-
-proc preprocess(c: var PreprocessContext; n: PNode): PNode =
-  # in order to fix bug #15243 without risking regressions, we preprocess
-  # the AST so that 'break' statements inside a 'try finally' also have the
-  # finally section. We need to duplicate local variables here and also
-  # detect: 'finally: raises X' which is currently not supported. We produce
-  # an error for this case for now. All this will be done properly with Yuriy's
-  # patch.
-
-  result = n
-  case n.kind
-  of nkTryStmt:
-    let f = n.lastSon
-    var didAddSomething = false
-    if f.kind == nkFinally:
-      c.finallys.add f.lastSon
-      didAddSomething = true
-
-    for i in 0 ..< n.len:
-      result[i] = preprocess(c, n[i])
-
-    if didAddSomething:
-      discard c.finallys.pop()
-
-  of nkWhileStmt, nkBlockStmt:
-    if n.hasYields == false: return n
-    c.blocks.add((n, c.finallys.len))
-    for i in 0 ..< n.len:
-      result[i] = preprocess(c, n[i])
-    discard c.blocks.pop()
-
-  of nkBreakStmt:
-    if c.blocks.len == 0:
-      discard
-    else:
-      var fin = -1
-      if n[0].kind == nkEmpty:
-        fin = c.blocks[^1][1]
-      elif n[0].kind == nkSym:
-        for i in countdown(c.blocks.high, 0):
-          if c.blocks[i][0].kind == nkBlockStmt and c.blocks[i][0][0].kind == nkSym and
-              c.blocks[i][0][0].sym == n[0].sym:
-            fin = c.blocks[i][1]
-            break
-
-      if fin >= 0:
-        result = newNodeI(nkStmtList, n.info)
-        for i in countdown(c.finallys.high, fin):
-          var vars = FreshVarsContext(tab: initTable[int, PSym](), config: c.config, info: n.info, idgen: c.idgen)
-          result.add freshVars(copyTree(c.finallys[i]), vars)
-          c.idgen = vars.idgen
-        result.add n
-  of nkSkip: discard
-  else:
-    for i in 0 ..< n.len:
-      result[i] = preprocess(c, n[i])
-
 proc transformClosureIterator*(g: ModuleGraph; idgen: IdGenerator; fn: PSym, n: PNode): PNode =
   var ctx: Ctx
   ctx.g = g
@@ -1412,13 +1350,14 @@ proc transformClosureIterator*(g: ModuleGraph; idgen: IdGenerator; fn: PSym, n: 
     ctx.stateVarSym = newSym(skVar, getIdent(ctx.g.cache, ":state"), nextSymId(idgen), fn, fn.info)
     ctx.stateVarSym.typ = g.createClosureIterStateType(fn, idgen)
   ctx.stateLoopLabel = newSym(skLabel, getIdent(ctx.g.cache, ":stateLoop"), nextSymId(idgen), fn, fn.info)
-  var pc = PreprocessContext(finallys: @[], config: g.config, idgen: idgen)
-  var n = preprocess(pc, n.toStmtList)
-  #echo "transformed into ", n
-  #var n = n.toStmtList
+  var n = n.toStmtList
 
   discard ctx.newState(n, nil)
   let gotoOut = newTree(nkGotoState, g.newIntLit(n.info, -1))
+
+  echo "INPUT --------"
+  echo renderTree(n)
+  echo "----"
 
   var ns = false
   n = ctx.lowerStmtListExprs(n, ns)
@@ -1430,7 +1369,7 @@ proc transformClosureIterator*(g: ModuleGraph; idgen: IdGenerator; fn: PSym, n: 
   discard ctx.transformClosureIteratorBody(n, gotoOut)
 
   # Optimize empty states away
-  ctx.deleteEmptyStates()
+  #TODO ctx.deleteEmptyStates()
 
   # Make new body by concatenating the list of states
   result = newNodeI(nkStmtList, n.info)
@@ -1444,9 +1383,9 @@ proc transformClosureIterator*(g: ModuleGraph; idgen: IdGenerator; fn: PSym, n: 
   result = ctx.transformStateAssignments(result)
   result = ctx.wrapIntoStateLoop(result)
 
-  # echo "TRANSFORM TO STATES: "
-  # echo renderTree(result)
+  echo "TRANSFORM TO STATES: "
+  echo renderTree(result)
 
-  # echo "exception table:"
-  # for i, e in ctx.exceptionTable:
-  #   echo i, " -> ", e
+  echo "exception table:"
+  for i, e in ctx.exceptionTable:
+    echo i, " -> ", e
