@@ -839,7 +839,7 @@ proc newEndFinallyNode(ctx: var Ctx, info: TLineInfo): PNode =
   let bod1 =
     newTree(nkStmtList,
       newTree(nkAsgn, ctx.newUnrollFinallyAccess(info), newIntTypeNode(0, ctx.g.getSysType(info, tyBool))),
-      newTree(nkAsgn, ctx.newUnrollUntilAccess(info), newIntTypeNode(0, ctx.g.getSysType(info, tyInt))),
+      newTree(nkAsgn, ctx.newUnrollUntilAccess(info), newIntTypeNode(-1, ctx.g.getSysType(info, tyInt))),
       newTree(nkGotoState, ctx.newAfterUnrollAccess(info))
     )
 
@@ -989,8 +989,11 @@ proc transformClosureIteratorBody(ctx: var Ctx, n: PNode, gotoOut: PNode): PNode
     else:
       # Partial unroll
       result.add(newTree(nkAsgn, ctx.newUnrollFinallyAccess(n.info), newIntTypeNode(1, ctx.g.getSysType(n.info, tyBool))))
-      result.add(newTree(nkAsgn, ctx.newUnrollUntilAccess(n.info), newIntTypeNode(breakableCtx[1], ctx.g.getSysType(n.info, tyInt))))
-      result.add(newTree(nkAsgn, ctx.newAfterUnrollAccess(n.info), newIntTypeNode(breakableCtx[0], ctx.g.getSysType(n.info, tyInt))))
+      let
+        afterUnroll = ctx.states[breakableCtx[0]][0]
+        unrollUntil = if breakableCtx[1] > 0: ctx.states[breakableCtx[1]][0] else: newIntTypeNode(breakableCtx[1], ctx.g.getSysType(n.info, tyInt))
+      result.add(newTree(nkAsgn, ctx.newUnrollUntilAccess(n.info), unrollUntil))
+      result.add(newTree(nkAsgn, ctx.newAfterUnrollAccess(n.info), afterUnroll))
       result.add(newTree(nkGotoState, ctx.g.newIntLit(n.info, ctx.nearestFinally)))
 
   of nkTryStmt, nkHiddenTryStmt:
@@ -1123,7 +1126,6 @@ proc transformStateAssignments(ctx: var Ctx, n: PNode): PNode =
     result.add(n)
 
   of nkGotoState:
-    echo renderTree(n)
     result = newNodeI(nkStmtList, n.info)
     #TODO
     #result.add(ctx.newStateAssgn(stateFromGotoState(n)))
@@ -1172,8 +1174,9 @@ proc skipThroughEmptyStates(ctx: var Ctx, n: PNode): PNode=
   of nkSkip:
     discard
   of nkGotoState:
-    result = copyTree(n)
-    result[0].intVal = ctx.skipEmptyStates(result[0].intVal.int)
+    if result[0].kind == nkIntLit:
+      result = copyTree(n)
+      result[0].intVal = ctx.skipEmptyStates(result[0].intVal.int)
   else:
     for i in 0..<n.len:
       n[i] = ctx.skipThroughEmptyStates(n[i])
@@ -1338,6 +1341,9 @@ proc deleteEmptyStates(ctx: var Ctx) =
         ctx.exceptionTable[i] = -ctx.skipEmptyStates(-excHandlState)
       elif excHandlState != 0:
         ctx.exceptionTable[i] = ctx.skipEmptyStates(excHandlState)
+    else:
+      # Update to the new state id for unrollUntils
+      ctx.states[i][0].intVal = ctx.skipEmptyStates(i)
 
   var i = 0
   while i < ctx.states.len - 1:
@@ -1366,9 +1372,9 @@ proc transformClosureIterator*(g: ModuleGraph; idgen: IdGenerator; fn: PSym, n: 
   discard ctx.newState(n, nil)
   let gotoOut = newTree(nkGotoState, g.newIntLit(n.info, -1))
 
-  echo "INPUT --------"
-  echo renderTree(n)
-  echo "----"
+  # echo "INPUT --------"
+  # echo renderTree(n)
+  # echo "----"
 
   var ns = false
   n = ctx.lowerStmtListExprs(n, ns)
@@ -1380,7 +1386,7 @@ proc transformClosureIterator*(g: ModuleGraph; idgen: IdGenerator; fn: PSym, n: 
   discard ctx.transformClosureIteratorBody(n, gotoOut)
 
   # Optimize empty states away
-  #TODO ctx.deleteEmptyStates()
+  ctx.deleteEmptyStates()
 
   # Make new body by concatenating the list of states
   result = newNodeI(nkStmtList, n.info)
@@ -1394,9 +1400,9 @@ proc transformClosureIterator*(g: ModuleGraph; idgen: IdGenerator; fn: PSym, n: 
   result = ctx.transformStateAssignments(result)
   result = ctx.wrapIntoStateLoop(result)
 
-  echo "TRANSFORM TO STATES: "
-  echo renderTree(result)
+  # echo "TRANSFORM TO STATES: "
+  # echo renderTree(result)
 
-  echo "exception table:"
-  for i, e in ctx.exceptionTable:
-    echo i, " -> ", e
+  # echo "exception table:"
+  # for i, e in ctx.exceptionTable:
+  #   echo i, " -> ", e
