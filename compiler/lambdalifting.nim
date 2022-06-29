@@ -983,6 +983,8 @@ proc liftForLoop*(g: ModuleGraph; body: PNode; idgen: IdGenerator; owner: PSym):
   elifBranch.add(bs)
 
   let br = newNodeI(nkBreakStmt, body.info)
+  #TODO this forces us to handle unnamed break in the
+  # closure transformation
   br.add(g.emptyNode)
 
   elifBranch.add(br)

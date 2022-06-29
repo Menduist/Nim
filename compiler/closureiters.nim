@@ -205,7 +205,11 @@ proc newEnvVarAccess(ctx: Ctx, s: PSym): PNode =
   else:
     result = newSymNode(s)
 
+proc hasReturnType(ctx: var Ctx): bool =
+  not(isNil(ctx.fn.typ[0]))
+
 proc newTmpResultAccess(ctx: var Ctx): PNode =
+  doAssert(ctx.hasReturnType)
   if ctx.tmpResultSym.isNil:
     ctx.tmpResultSym = ctx.newEnvVar(":tmpResult", ctx.fn.typ[0])
   ctx.newEnvVarAccess(ctx.tmpResultSym)
@@ -351,6 +355,7 @@ proc addElseToExcept(ctx: var Ctx, n: PNode) =
       branchBody.add(newTree(nkAsgn,
         ctx.newUnrollFinallyAccess(n.info),
         newIntTypeNode(1, ctx.g.getSysType(n.info, tyBool))))
+      branchBody.add(newTree(nkAsgn, ctx.newUnrollUntilAccess(n.info), newIntTypeNode(-1, ctx.g.getSysType(n.info, tyInt))))
 
     block: # :curExc = getCurrentException()
       branchBody.add(newTree(nkAsgn,
@@ -812,9 +817,13 @@ proc newEndFinallyNode(ctx: var Ctx, info: TLineInfo): PNode =
   let cmp = newTree(nkCall, newSymNode(ctx.g.getSysMagic(info, "==", mEqRef), info), curExc, nilnode)
   cmp.typ = ctx.g.getSysType(info, tyBool)
 
-  let asgn = newTree(nkFastAsgn,
-    newSymNode(getClosureIterResult(ctx.g, ctx.fn, ctx.idgen), info),
-    ctx.newTmpResultAccess())
+  let asgn =
+    if ctx.hasReturnType:
+      newTree(nkFastAsgn,
+        newSymNode(getClosureIterResult(ctx.g, ctx.fn, ctx.idgen), info),
+        ctx.newTmpResultAccess())
+    else:
+      newTree(nkEmpty)
 
   let retStmt = newTree(nkReturnStmt, asgn)
   let branch = newTree(nkElifBranch, cmp, retStmt)
@@ -825,10 +834,6 @@ proc newEndFinallyNode(ctx: var Ctx, info: TLineInfo): PNode =
   raiseStmt.info = info
   let elseBranch = newTree(nkElse, newTree(nkStmtList, nullifyExc, raiseStmt))
 
-  let ifBody = newTree(nkIfStmt, branch, elseBranch)
-  let elifBranch = newTree(nkElifBranch, ctx.newUnrollFinallyAccess(info), ifBody)
-  elifBranch.info = info
-
   let cmp1 = newTree(nkCall, newSymNode(ctx.g.getSysMagic(info, "==", mEqRef), info), ctx.newUnrollUntilAccess(info), ctx.g.newIntLit(info, ctx.nearestFinally))
   cmp1.typ = ctx.g.getSysType(info, tyBool)
   let bod1 =
@@ -837,14 +842,18 @@ proc newEndFinallyNode(ctx: var Ctx, info: TLineInfo): PNode =
       newTree(nkAsgn, ctx.newUnrollUntilAccess(info), newIntTypeNode(0, ctx.g.getSysType(info, tyInt))),
       newTree(nkGotoState, ctx.newAfterUnrollAccess(info))
     )
-  result = newTree(nkStmtList,
+
+  let ifBody = newTree(nkStmtList,
     newTree(nkIfStmt, newTree(nkElifBranch, cmp1, bod1)),
-    newTree(nkIfStmt, elifBranch)
+    newTree(nkIfStmt, branch, elseBranch)
   )
+  let elifBranch = newTree(nkElifBranch, ctx.newUnrollFinallyAccess(info), ifBody)
+  elifBranch.info = info
+
+  result = newTree(nkIfStmt, elifBranch)
 
 proc transformReturnsInTry(ctx: var Ctx, n: PNode): PNode =
   result = n
-  # TODO: This is very inefficient. It traverses the node, looking for nkYieldStmt.
   case n.kind
   of nkReturnStmt:
     # We're somewhere in try, transform to finally unrolling
@@ -857,6 +866,7 @@ proc transformReturnsInTry(ctx: var Ctx, n: PNode): PNode =
       asgn.add(ctx.newUnrollFinallyAccess(n.info))
       asgn.add(newIntTypeNode(1, ctx.g.getSysType(n.info, tyBool)))
       result.add(asgn)
+      result.add(newTree(nkAsgn, ctx.newUnrollUntilAccess(n.info), newIntTypeNode(-1, ctx.g.getSysType(n.info, tyInt))))
 
     if n[0].kind != nkEmpty:
       let asgnTmpResult = newNodeI(nkAsgn, n.info)
@@ -969,10 +979,9 @@ proc transformClosureIteratorBody(ctx: var Ctx, n: PNode, gotoOut: PNode): PNode
   of nkBreakStmt:
     result = newNodeI(nkStmtList, n.info)
     let
-      #TODO is this necessary?
-      # (unnamed break handling)
-      #symId = if n[0].kind == nkSym: n[0].sym.id else: ctx.nearestBreakableScope
-      symId = n[0].sym.id
+      #TODO fix lambdalifting to avoid this
+      symId = if n[0].kind == nkSym: n[0].sym.id else: ctx.nearestBreakableScope
+      #symId = n[0].sym.id
       breakableCtx = ctx.breakableScopes[symId]
     if breakableCtx[1] == ctx.nearestFinally:
       # No finally in the block, let's just finish it
@@ -1236,6 +1245,8 @@ proc newCatchBody(ctx: var Ctx, info: TLineInfo): PNode {.inline.} =
 
     let asgn = newTree(nkAsgn, ctx.newUnrollFinallyAccess(info), cond)
     result.add(asgn)
+    #TODO what's the impact of unrollUntil here
+    result.add(newTree(nkAsgn, ctx.newUnrollUntilAccess(info), newIntTypeNode(-1, ctx.g.getSysType(info, tyInt))))
 
   # if :state < 0: :state = -:state
   block:
