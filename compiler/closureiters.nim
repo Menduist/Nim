@@ -137,6 +137,10 @@ when defined(nimPreviewSlimSystem):
   import std/assertions
 
 type
+  BreakableScope = tuple
+    outState: int
+    nearestFinally: int
+
   Ctx = object
     g: ModuleGraph
     fn: PSym
@@ -158,8 +162,7 @@ type
     curExcHandlingState: int # Negative for except, positive for finally
     nearestFinally: int # Index of the nearest finally block. For try/except it
                     # is their finally. For finally it is parent finally. Otherwise -1
-    nearestBreakableScope: int
-    breakableScopes: Table[int, (int, int)]
+    breakableScopes: Table[int, BreakableScope] # Maps a block label to it's data
     idgen: IdGenerator
 
 const
@@ -964,34 +967,32 @@ proc transformClosureIteratorBody(ctx: var Ctx, n: PNode, gotoOut: PNode): PNode
 
   of nkBlockStmt:
     let
-      previousNearestBreakableScope = ctx.nearestBreakableScope
       # need to create a "trampoline state" since we don't know the gotoOut id yet
+      # it will get optimized out during the unused state removal
       trampoline = ctx.newState(gotoOut, nil)
       symId = n[0].sym.id
     ctx.breakableScopes[symId] = (trampoline, ctx.nearestFinally)
-    ctx.nearestBreakableScope = symId
 
-    #result = newNodeI(nkStmtList, n.info)
     result = ctx.transformClosureIteratorBody(n[1], gotoOut)
-
-    ctx.nearestBreakableScope = previousNearestBreakableScope
 
   of nkBreakStmt:
     result = newNodeI(nkStmtList, n.info)
     let
-      #TODO fix lambdalifting to avoid this
-      symId = if n[0].kind == nkSym: n[0].sym.id else: ctx.nearestBreakableScope
-      #symId = n[0].sym.id
+      symId = n[0].sym.id
       breakableCtx = ctx.breakableScopes[symId]
-    if breakableCtx[1] == ctx.nearestFinally:
-      # No finally in the block, let's just finish it
-      result.add(newTree(nkGotoState, ctx.g.newIntLit(n.info, breakableCtx[0])))
+    if breakableCtx.nearestFinally == ctx.nearestFinally:
+      # No finally in the block, let's just break it
+      result.add(newTree(nkGotoState, ctx.g.newIntLit(n.info, breakableCtx.outState)))
     else:
       # Partial unroll
       result.add(newTree(nkAsgn, ctx.newUnrollFinallyAccess(n.info), newIntTypeNode(1, ctx.g.getSysType(n.info, tyBool))))
       let
-        afterUnroll = ctx.states[breakableCtx[0]][0]
-        unrollUntil = if breakableCtx[1] > 0: ctx.states[breakableCtx[1]][0] else: newIntTypeNode(breakableCtx[1], ctx.g.getSysType(n.info, tyInt))
+        afterUnroll = ctx.states[breakableCtx.outState][0]
+        unrollUntil =
+          if breakableCtx.nearestFinally > 0:
+            ctx.states[breakableCtx.nearestFinally][0]
+          else:
+            newIntTypeNode(0, ctx.g.getSysType(n.info, tyInt))
       result.add(newTree(nkAsgn, ctx.newUnrollUntilAccess(n.info), unrollUntil))
       result.add(newTree(nkAsgn, ctx.newAfterUnrollAccess(n.info), afterUnroll))
       result.add(newTree(nkGotoState, ctx.g.newIntLit(n.info, ctx.nearestFinally)))
@@ -1069,10 +1070,6 @@ proc transformClosureIteratorBody(ctx: var Ctx, n: PNode, gotoOut: PNode): PNode
     for i in 0..<n.len:
       n[i] = ctx.transformClosureIteratorBody(n[i], gotoOut)
 
-proc stateFromGotoState(n: PNode): int =
-  assert(n.kind == nkGotoState)
-  result = n[0].intVal.int
-
 proc transformStateAssignments(ctx: var Ctx, n: PNode): PNode =
   # This transforms 3 patterns:
   ########################## 1
@@ -1100,7 +1097,8 @@ proc transformStateAssignments(ctx: var Ctx, n: PNode): PNode =
       assert(n[1].kind == nkGotoState)
 
       result = newNodeI(nkStmtList, n.info)
-      result.add(ctx.newStateAssgn(stateFromGotoState(n[1])))
+      assert(n[1][0].kind == nkIntLit)
+      result.add(ctx.newStateAssgn(n[1][0]))
 
       var retStmt = newNodeI(nkReturnStmt, n.info)
       if n[0][0].kind != nkEmpty:
@@ -1127,9 +1125,7 @@ proc transformStateAssignments(ctx: var Ctx, n: PNode): PNode =
 
   of nkGotoState:
     result = newNodeI(nkStmtList, n.info)
-    #TODO
-    #result.add(ctx.newStateAssgn(stateFromGotoState(n)))
-    result.add(ctx.newStateAssgn(n[0]))
+    result.add(copyTree(ctx.newStateAssgn(n[0])))
 
     let breakState = newNodeI(nkBreakStmt, n.info)
     breakState.add(newSymNode(ctx.stateLoopLabel))
@@ -1248,7 +1244,6 @@ proc newCatchBody(ctx: var Ctx, info: TLineInfo): PNode {.inline.} =
 
     let asgn = newTree(nkAsgn, ctx.newUnrollFinallyAccess(info), cond)
     result.add(asgn)
-    #TODO what's the impact of unrollUntil here
     result.add(newTree(nkAsgn, ctx.newUnrollUntilAccess(info), newIntTypeNode(-1, ctx.g.getSysType(info, tyInt))))
 
   # if :state < 0: :state = -:state

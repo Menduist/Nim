@@ -890,7 +890,7 @@ proc liftLambdasForTopLevel*(module: PSym, body: PNode): PNode =
 
 # ------------------- iterator transformation --------------------------------
 
-proc liftForLoop*(g: ModuleGraph; body: PNode; idgen: IdGenerator; owner: PSym): PNode =
+proc liftForLoop*(g: ModuleGraph; body: PNode; breakLabel: PSym; idgen: IdGenerator; owner: PSym): PNode =
   # problem ahead: the iterator could be invoked indirectly, but then
   # we don't know what environment to create here:
   #
@@ -983,9 +983,7 @@ proc liftForLoop*(g: ModuleGraph; body: PNode; idgen: IdGenerator; owner: PSym):
   elifBranch.add(bs)
 
   let br = newNodeI(nkBreakStmt, body.info)
-  #TODO this forces us to handle unnamed break in the
-  # closure transformation
-  br.add(g.emptyNode)
+  br.add(newSymNode(breakLabel))
 
   elifBranch.add(br)
   ibs.add(elifBranch)

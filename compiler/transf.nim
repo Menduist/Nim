@@ -676,7 +676,7 @@ proc transformFor(c: PTransf, n: PNode): PNode =
     result[1] = n
     result[1][^1] = transformLoopBody(c, n[^1])
     result[1][^2] = transform(c, n[^2])
-    result[1] = lambdalifting.liftForLoop(c.graph, result[1], c.idgen, getCurrOwner(c))
+    result[1] = lambdalifting.liftForLoop(c.graph, result[1], labl, c.idgen, getCurrOwner(c))
     discard c.breakSyms.pop
     return result
 
