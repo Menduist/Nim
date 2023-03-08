@@ -41,13 +41,7 @@ type
 
 proc hashType(c: var MD5Context, t: PType; flags: set[ConsiderFlag])
 
-template includeIdHash(c: var MD5Context, s: PSym) =
-  # Include the symbol ID to disambiguate symbols with identical names and
-  # identical module names. (bug #20139)
-  c &= hash(s.itemId)
-
 proc hashSym(c: var MD5Context, s: PSym) =
-  includeIdHash(c, s)
   if sfAnon in s.flags or s.kind == skGenericParam:
     c &= ":anon"
   else:
@@ -58,7 +52,6 @@ proc hashSym(c: var MD5Context, s: PSym) =
       it = it.owner
 
 proc hashTypeSym(c: var MD5Context, s: PSym) =
-  includeIdHash(c, s)
   if sfAnon in s.flags or s.kind == skGenericParam:
     c &= ":anon"
   else:
